@@ -1,0 +1,5 @@
+itsasecret
+*.exe
+*.test
+*.out
+/dist/
