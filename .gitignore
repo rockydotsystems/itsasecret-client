@@ -3,3 +3,4 @@ itsasecret
 *.test
 *.out
 /dist/
+.direnv/

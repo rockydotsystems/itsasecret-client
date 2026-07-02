@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"itsasecret.dev/cli/internal/api"
+	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/config"
 
 	"github.com/spf13/cobra"
@@ -31,13 +32,12 @@ func newLoginCmd() *cobra.Command {
 			fmt.Scanln(&password)
 
 			client := api.NewClient(cfg.APIURL)
-			resp, err := client.Login(cmd.Context(), email, password)
+			session, err := auth.Login(cmd.Context(), client, email, password)
 			if err != nil {
 				return fmt.Errorf("login failed: %w", err)
 			}
-			cfg.SessionToken = resp.Token
-			if err := cfg.Save(); err != nil {
-				return fmt.Errorf("saving config: %w", err)
+			if err := auth.SaveSession(cfg, session); err != nil {
+				return fmt.Errorf("saving session: %w", err)
 			}
 			fmt.Println("Logged in.")
 			return nil

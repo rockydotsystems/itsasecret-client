@@ -8,8 +8,10 @@ import (
 )
 
 type Config struct {
-	APIURL       string `json:"apiUrl"`
-	SessionToken string `json:"sessionToken"`
+	APIURL       string            `json:"apiUrl"`
+	SessionToken string            `json:"sessionToken"`
+	SessionKey   string            `json:"sessionKey,omitempty"`
+	OrgKeys      map[string]string `json:"orgKeys,omitempty"`
 }
 
 func dir() (string, error) {

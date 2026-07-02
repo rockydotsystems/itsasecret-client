@@ -3,7 +3,8 @@ package commands
 import (
 	"fmt"
 
-	"itsasecret.dev/cli/internal/config"
+	"itsasecret.dev/cli/internal/api"
+	"itsasecret.dev/cli/internal/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -18,12 +19,9 @@ func newForkCmd() *cobra.Command {
 		Use:   "fork",
 		Short: "Fork an environment (e.g. production → staging)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
+			cfg, session, err := auth.LoadSessionConfig()
 			if err != nil {
 				return err
-			}
-			if cfg.SessionToken == "" {
-				return fmt.Errorf("not logged in — run `itsasecret login` first")
 			}
 			if project == "" {
 				return fmt.Errorf("--project is required")
@@ -34,8 +32,13 @@ func newForkCmd() *cobra.Command {
 			if name == "" {
 				return fmt.Errorf("--name is required (new environment name)")
 			}
-			// TODO: call API fork endpoint
-			return fmt.Errorf("not yet implemented")
+
+			client := api.NewClient(cfg.APIURL).WithToken(session.Token)
+			if err := client.ForkEnv(cmd.Context(), project, env, name); err != nil {
+				return err
+			}
+			fmt.Printf("Forked %s/%s → %s\n", project, env, name)
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")

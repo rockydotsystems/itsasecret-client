@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"itsasecret.dev/cli/internal/api"
-	"itsasecret.dev/cli/internal/config"
+	"itsasecret.dev/cli/internal/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -21,12 +21,9 @@ func newPullCmd() *cobra.Command {
 		Use:   "pull",
 		Short: "Pull env vars & secrets into a file or shell",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
+			cfg, session, err := auth.LoadSessionConfig()
 			if err != nil {
 				return err
-			}
-			if cfg.SessionToken == "" {
-				return fmt.Errorf("not logged in — run `itsasecret login` first")
 			}
 			if project == "" {
 				return fmt.Errorf("--project is required")
@@ -35,7 +32,7 @@ func newPullCmd() *cobra.Command {
 				env = "production"
 			}
 
-			client := api.NewClient(cfg.APIURL).WithToken(cfg.SessionToken)
+			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			vars, err := client.Pull(cmd.Context(), project, env)
 			if err != nil {
 				return err
