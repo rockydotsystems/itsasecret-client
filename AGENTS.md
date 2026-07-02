@@ -1,0 +1,68 @@
+# AGENTS.md — client (itsasecret CLI)
+
+## What this is
+
+The Go CLI for itsasecret. Binary name `itsasecret`, aliased to `shh`. Syncs
+env vars/secrets across environments, populates `.env` files or shell env
+(direnv integration). Full product/architecture docs live in `../docs/`.
+
+## Tech stack
+
+- **Language**: Go (single static binary, cross-compilable)
+- **CLI framework**: cobra
+- **Crypto**: stdlib + vetted third-party (Argon2id, AES-GCM/XChaCha20-Poly1305)
+- **API client**: generated from the www Worker's OpenAPI spec (`@hono/zod-openapi` on the server side → `oapi-codegen` or hand-written typed client on this side)
+
+## Commands (via nix flake)
+
+```
+nix develop                    # enter dev shell (go, gopls, golangci-lint)
+nix run .#run -- <args>        # go run ./cmd/itsasecret <args>
+nix run .#test                 # go test ./...
+nix run .#build                # go build -o itsasecret ./cmd/itsasecret
+nix run .#lint                 # golangci-lint run
+go mod tidy                    # tidy deps (inside dev shell)
+```
+
+## CLI behavior (from docs/product-spec.md)
+
+- Binary name `itsasecret`, alias `shh`.
+- `shh pull --shell --project <project-id>` — populate env vars directly into shell (for `.envrc`/direnv).
+- Can populate a file (default `.env`) with exported secret values.
+- Can do most things the website can: set values, view them, fork environments, etc.
+- Project IDs are short opaque IDs (nanoid-style, e.g. `heyq1dpc`). Environment selected by flag/branch-name, defaults to `production`.
+
+## Key decisions (from docs/)
+
+- **Auth**: master password → Argon2id KDF → derive key → unwrap org shared key. CLI non-interactive auth needs a long-lived scoped token after `shh login` (stores token + cached key locally) so `.envrc` usage doesn't prompt every shell load.
+- **Transport**: per-session ECDH key negotiated at login; server re-encrypts secrets with it. CLI holds the session key to decrypt.
+- **RBAC roles**: `read`, `write`, `admin` at environment level.
+
+## Repo layout
+
+```
+client/
+  flake.nix              # nix dev shell + apps
+  go.mod
+  cmd/
+    itsasecret/          # main entry (binary: itsasecret)
+  internal/
+    api/                 # HTTP client, typed API surface
+    auth/                # login, token storage, KDF
+    crypto/              # Argon2id, AES-GCM, ECDH, envelope encrypt/decrypt
+    config/              # config file (~/.config/itsasecret/)
+    commands/            # cobra command tree (pull, push, set, get, fork, login, ...)
+```
+
+## Version control
+
+This repo uses **jj** (Jujutsu). Use `jj new` to create new revisions — do not
+write descriptions (the repo owner handles that). Don't use `git commit`.
+
+## Conventions
+
+- Idiomatic Go, `internal/` for unexported packages.
+- No secrets/tokens logged or printed.
+- Use `crypto/rand` for all random generation, never `math/rand`.
+- Config stored at `~/.config/itsasecret/` (XDG-compatible).
+- Alias `shh` is a symlink or wrapper to the `itsasecret` binary.
