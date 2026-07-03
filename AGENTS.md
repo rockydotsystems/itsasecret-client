@@ -27,6 +27,10 @@ go mod tidy                    # tidy deps (inside dev shell)
 ## CLI behavior (from docs/product-spec.md)
 
 - Binary name `itsasecret`, alias `shh`.
+- `shh secret set KEY=VALUE` / `shh var set KEY=VALUE` — values are set one at
+  a time (secrets encrypted client-side, vars plaintext); there is
+  deliberately **no bulk `push`**. Read back with `shh secret get <key>` /
+  `shh var get <key>`.
 - `shh pull --shell --project <project-id>` — populate env vars directly into shell (for `.envrc`/direnv).
 - Can populate a file (default `.env`) with exported secret values.
 - Can do most things the website can: set values, view them, fork environments, etc.
@@ -51,7 +55,7 @@ client/
     auth/                # login, token storage, KDF
     crypto/              # Argon2id, AES-GCM, ECDH, envelope encrypt/decrypt
     config/              # config file (~/.config/itsasecret/)
-    commands/            # cobra command tree (pull, push, set, get, fork, login, ...)
+    commands/            # cobra command tree (pull, secret, var, fork, login, ...)
 ```
 
 ## Version control
