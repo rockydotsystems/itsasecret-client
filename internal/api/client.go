@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,13 +39,13 @@ func (c *Client) WithSessionKey(key []byte) *Client {
 type LoginRequest struct {
 	Email           string `json:"email"`
 	Password        string `json:"password"`
-	ClientPublicKey string `json:"clientPublicKey"`
+	ClientPublicKey string `json:"clientPubkey"`
 }
 
 type LoginResponse struct {
 	Token           string            `json:"token"`
-	ServerPublicKey string            `json:"serverPublicKey"`
-	WrappedOrgKeys  map[string]string `json:"wrappedOrgKeys"`
+	ServerPublicKey string            `json:"serverPubkey"`
+	WrappedOrgKeys  map[string]string `json:"orgKeys"`
 }
 
 func (c *Client) Login(ctx context.Context, email, password, clientPubKey string) (*LoginResponse, error) {
@@ -69,7 +70,10 @@ func (c *Client) Login(ctx context.Context, email, password, clientPubKey string
 }
 
 type PullResponse struct {
-	Vars    map[string]string `json:"vars"`
+	Vars []struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	} `json:"vars"`
 	Secrets map[string]string `json:"secrets"`
 }
 
@@ -88,8 +92,8 @@ func (c *Client) Pull(ctx context.Context, projectID, envName string) (map[strin
 		return nil, err
 	}
 	result := make(map[string]string, len(out.Vars)+len(out.Secrets))
-	for k, v := range out.Vars {
-		result[k] = v
+	for _, v := range out.Vars {
+		result[v.Key] = v.Value
 	}
 	for k, encrypted := range out.Secrets {
 		if len(c.sessionKey) == 0 {
@@ -212,6 +216,9 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (*http.R
 	}
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	if len(c.sessionKey) > 0 {
+		req.Header.Set("X-Session-Key", base64.StdEncoding.EncodeToString(c.sessionKey))
 	}
 	return c.http.Do(req)
 }

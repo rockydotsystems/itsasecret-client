@@ -3,12 +3,19 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"itsasecret.dev/cli/internal/api"
 	"itsasecret.dev/cli/internal/auth"
 
 	"github.com/spf13/cobra"
 )
+
+// shellQuote single-quotes a value so it survives `source`/`eval` and direnv's
+// dotenv parser intact, including spaces, $, and quotes.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
 
 func newPullCmd() *cobra.Command {
 	var (
@@ -40,7 +47,7 @@ func newPullCmd() *cobra.Command {
 
 			if shellMode {
 				for k, v := range vars {
-					fmt.Printf("export %s=%s\n", k, v)
+					fmt.Printf("export %s=%s\n", k, shellQuote(v))
 				}
 				return nil
 			}
@@ -55,7 +62,7 @@ func newPullCmd() *cobra.Command {
 			}
 			defer f.Close()
 			for k, v := range vars {
-				fmt.Fprintf(f, "export %s=%s\n", k, v)
+				fmt.Fprintf(f, "export %s=%s\n", k, shellQuote(v))
 			}
 			fmt.Printf("Wrote %s\n", path)
 			return nil

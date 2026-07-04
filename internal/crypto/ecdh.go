@@ -16,11 +16,11 @@ func GenerateKeyPair() (*ecdh.PrivateKey, error) {
 }
 
 func PublicKeyToBase64(key *ecdh.PublicKey) (string, error) {
-	return base64.RawURLEncoding.EncodeToString(key.Bytes()), nil
+	return base64.StdEncoding.EncodeToString(key.Bytes()), nil
 }
 
 func DeriveSessionKey(privateKey *ecdh.PrivateKey, peerPublicKeyBase64 string) ([]byte, error) {
-	peerRaw, err := base64.RawURLEncoding.DecodeString(peerPublicKeyBase64)
+	peerRaw, err := base64.StdEncoding.DecodeString(peerPublicKeyBase64)
 	if err != nil {
 		return nil, fmt.Errorf("decode peer public key: %w", err)
 	}
@@ -32,7 +32,7 @@ func DeriveSessionKey(privateKey *ecdh.PrivateKey, peerPublicKeyBase64 string) (
 	if err != nil {
 		return nil, fmt.Errorf("ecdh: %w", err)
 	}
-	h := hkdf.New(sha256.New, shared, nil, []byte("itsasecret-session-key"))
+	h := hkdf.New(sha256.New, shared, nil, []byte("itsasecret-session-v1"))
 	sessionKey := make([]byte, 32)
 	if _, err := io.ReadFull(h, sessionKey); err != nil {
 		return nil, fmt.Errorf("hkdf: %w", err)

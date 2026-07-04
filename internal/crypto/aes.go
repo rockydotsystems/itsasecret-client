@@ -52,11 +52,11 @@ func EncryptString(key []byte, plaintext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(ct), nil
+	return base64.StdEncoding.EncodeToString(ct), nil
 }
 
 func DecryptString(key []byte, encoded string) (string, error) {
-	ct, err := base64.RawURLEncoding.DecodeString(encoded)
+	ct, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", fmt.Errorf("base64 decode: %w", err)
 	}
@@ -75,18 +75,26 @@ func GenerateKey() []byte {
 	return key
 }
 
+// WrapKey mirrors the server's envelope.wrapKey: the key bytes are base64
+// (std) encoded before being AES-GCM sealed, and the ciphertext is std-base64
+// for the wire.
 func WrapKey(wrappingKey, keyToWrap []byte) (string, error) {
-	ct, err := Encrypt(wrappingKey, keyToWrap)
+	inner := base64.StdEncoding.EncodeToString(keyToWrap)
+	ct, err := Encrypt(wrappingKey, []byte(inner))
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(ct), nil
+	return base64.StdEncoding.EncodeToString(ct), nil
 }
 
 func UnwrapKey(wrappingKey []byte, wrappedKey string) ([]byte, error) {
-	ct, err := base64.RawURLEncoding.DecodeString(wrappedKey)
+	ct, err := base64.StdEncoding.DecodeString(wrappedKey)
 	if err != nil {
 		return nil, fmt.Errorf("base64 decode: %w", err)
 	}
-	return Decrypt(wrappingKey, ct)
+	inner, err := Decrypt(wrappingKey, ct)
+	if err != nil {
+		return nil, err
+	}
+	return base64.StdEncoding.DecodeString(string(inner))
 }
