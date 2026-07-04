@@ -24,6 +24,13 @@ nix run .#lint                 # golangci-lint run
 go mod tidy                    # tidy deps (inside dev shell)
 ```
 
+## Running against a local server
+
+To point the CLI at a locally running `www` server instead of production, see
+[`docs/local-server.md`](docs/local-server.md). In short: start the `www` dev
+server, then `itsasecret login --api http://localhost:3000` — the URL persists
+to the config file, so later commands need no flag.
+
 ## CLI behavior (from docs/product-spec.md)
 
 - Binary name `itsasecret`, alias `shh`.
