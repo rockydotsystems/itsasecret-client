@@ -20,10 +20,7 @@ func newVarCmd() *cobra.Command {
 }
 
 func newVarSetCmd() *cobra.Command {
-	var (
-		project string
-		env     string
-	)
+	var scope scopeFlags
 	cmd := &cobra.Command{
 		Use:   "set <KEY=VALUE>",
 		Short: "Set a plaintext env var",
@@ -37,11 +34,9 @@ func newVarSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if project == "" {
-				return fmt.Errorf("--project is required")
-			}
-			if env == "" {
-				env = "production"
+			project, env, err := scope.resolve()
+			if err != nil {
+				return err
 			}
 
 			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
@@ -52,16 +47,12 @@ func newVarSetCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
-	cmd.Flags().StringVar(&env, "env", "", "environment name (default: production)")
+	addScopeFlags(cmd, &scope)
 	return cmd
 }
 
 func newVarGetCmd() *cobra.Command {
-	var (
-		project string
-		env     string
-	)
+	var scope scopeFlags
 	cmd := &cobra.Command{
 		Use:   "get <key>",
 		Short: "Get a single env var value",
@@ -71,11 +62,9 @@ func newVarGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if project == "" {
-				return fmt.Errorf("--project is required")
-			}
-			if env == "" {
-				env = "production"
+			project, env, err := scope.resolve()
+			if err != nil {
+				return err
 			}
 
 			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
@@ -87,7 +76,6 @@ func newVarGetCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
-	cmd.Flags().StringVar(&env, "env", "", "environment name (default: production)")
+	addScopeFlags(cmd, &scope)
 	return cmd
 }

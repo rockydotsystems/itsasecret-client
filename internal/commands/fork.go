@@ -11,9 +11,8 @@ import (
 
 func newForkCmd() *cobra.Command {
 	var (
-		project string
-		env     string
-		name    string
+		scope scopeFlags
+		name  string
 	)
 	cmd := &cobra.Command{
 		Use:   "fork",
@@ -23,11 +22,9 @@ func newForkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if project == "" {
-				return fmt.Errorf("--project is required")
-			}
-			if env == "" {
-				env = "production"
+			project, env, err := scope.resolve()
+			if err != nil {
+				return err
 			}
 			if name == "" {
 				return fmt.Errorf("--name is required (new environment name)")
@@ -41,8 +38,7 @@ func newForkCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
-	cmd.Flags().StringVar(&env, "env", "", "source environment name (default: production)")
+	addScopeFlags(cmd, &scope)
 	cmd.Flags().StringVar(&name, "name", "", "new fork name (required)")
 	return cmd
 }

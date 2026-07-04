@@ -39,6 +39,11 @@ to the config file, so later commands need no flag.
   deliberately **no bulk `push`**. Read back with `shh secret get <key>` /
   `shh var get <key>`.
 - `shh pull --shell --project <project-id>` — populate env vars directly into shell (for `.envrc`/direnv).
+- `shh link --project <id> [--env <name>]` — pins a directory to a project/
+  environment by writing `.shh.project` (committed) and `.shh.env` (local,
+  auto-added to `.gitignore`). Commands resolve scope as flag > `.shh.*` file
+  (found by walking up from cwd, each file independently) > `production` for
+  env. `shh link` with no flags prints the current resolution.
 - Can populate a file (default `.env`) with exported secret values.
 - Can do most things the website can: set values, view them, fork environments, etc.
 - Project IDs are short opaque IDs (nanoid-style, e.g. `heyq1dpc`). Environment selected by flag/branch-name, defaults to `production`.
@@ -62,7 +67,8 @@ client/
     auth/                # login, token storage, KDF
     crypto/              # Argon2id, AES-GCM, ECDH, envelope encrypt/decrypt
     config/              # config file (~/.config/itsasecret/)
-    commands/            # cobra command tree (pull, secret, var, fork, login, ...)
+    localcfg/            # per-directory .shh.project / .shh.env marker files
+    commands/            # cobra command tree (pull, secret, var, fork, login, link, ...)
 ```
 
 ## Version control

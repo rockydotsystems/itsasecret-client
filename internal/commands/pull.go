@@ -19,8 +19,7 @@ func shellQuote(s string) string {
 
 func newPullCmd() *cobra.Command {
 	var (
-		project   string
-		env       string
+		scope     scopeFlags
 		shellMode bool
 		outFile   string
 	)
@@ -32,11 +31,9 @@ func newPullCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if project == "" {
-				return fmt.Errorf("--project is required")
-			}
-			if env == "" {
-				env = "production"
+			project, env, err := scope.resolve()
+			if err != nil {
+				return err
 			}
 
 			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
@@ -68,8 +65,7 @@ func newPullCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
-	cmd.Flags().StringVar(&env, "env", "", "environment name (default: production)")
+	addScopeFlags(cmd, &scope)
 	cmd.Flags().BoolVar(&shellMode, "shell", false, "emit exports to stdout for direnv/.envrc")
 	cmd.Flags().StringVar(&outFile, "out", "", "output file (default: .env)")
 	return cmd

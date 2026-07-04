@@ -21,10 +21,7 @@ func newSecretCmd() *cobra.Command {
 }
 
 func newSecretListCmd() *cobra.Command {
-	var (
-		project string
-		env     string
-	)
+	var scope scopeFlags
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List secret keys in an environment (values not shown)",
@@ -34,11 +31,9 @@ func newSecretListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if project == "" {
-				return fmt.Errorf("--project is required")
-			}
-			if env == "" {
-				env = "production"
+			project, env, err := scope.resolve()
+			if err != nil {
+				return err
 			}
 
 			client := api.NewClient(cfg.APIURL).WithToken(session.Token)
@@ -52,16 +47,12 @@ func newSecretListCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
-	cmd.Flags().StringVar(&env, "env", "", "environment name (default: production)")
+	addScopeFlags(cmd, &scope)
 	return cmd
 }
 
 func newSecretSetCmd() *cobra.Command {
-	var (
-		project string
-		env     string
-	)
+	var scope scopeFlags
 	cmd := &cobra.Command{
 		Use:   "set <KEY=VALUE>",
 		Short: "Set a secret, encrypted on this machine before it syncs",
@@ -75,11 +66,9 @@ func newSecretSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if project == "" {
-				return fmt.Errorf("--project is required")
-			}
-			if env == "" {
-				env = "production"
+			project, env, err := scope.resolve()
+			if err != nil {
+				return err
 			}
 
 			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
@@ -90,16 +79,12 @@ func newSecretSetCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
-	cmd.Flags().StringVar(&env, "env", "", "environment name (default: production)")
+	addScopeFlags(cmd, &scope)
 	return cmd
 }
 
 func newSecretGetCmd() *cobra.Command {
-	var (
-		project string
-		env     string
-	)
+	var scope scopeFlags
 	cmd := &cobra.Command{
 		Use:   "get <key>",
 		Short: "Get a single secret value (decrypted)",
@@ -109,11 +94,9 @@ func newSecretGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if project == "" {
-				return fmt.Errorf("--project is required")
-			}
-			if env == "" {
-				env = "production"
+			project, env, err := scope.resolve()
+			if err != nil {
+				return err
 			}
 
 			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
@@ -125,7 +108,6 @@ func newSecretGetCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
-	cmd.Flags().StringVar(&env, "env", "", "environment name (default: production)")
+	addScopeFlags(cmd, &scope)
 	return cmd
 }

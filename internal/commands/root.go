@@ -13,6 +13,7 @@ func NewRootCmd() *cobra.Command {
 		Short: "Sync env vars & secrets across environments",
 	}
 	cmd.AddCommand(newLoginCmd())
+	cmd.AddCommand(newLinkCmd())
 	cmd.AddCommand(newPullCmd())
 	cmd.AddCommand(newSecretCmd())
 	cmd.AddCommand(newVarCmd())

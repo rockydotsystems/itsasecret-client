@@ -98,14 +98,32 @@ export XDG_CONFIG_HOME=/tmp/itsasecret-dev
 shh login --api http://localhost:3000
 ```
 
+## Linking a directory
+
+Instead of passing `--project`/`--env` on every command, pin the working
+directory once:
+
+```sh
+shh link --project <project-id> --env staging
+```
+
+This writes `.shh.project` (the project ID — commit it) and `.shh.env` (the
+environment name — local to your machine, automatically added to
+`.gitignore`). Commands look for both files in the current directory and its
+parents, so linking a repo root covers every subdirectory. Explicit flags
+always override the files. Run `shh link` with no flags to see what the
+current directory resolves to.
+
 ## Command reference
 
-All commands take `--project <id>` (required) and `--env <name>` (defaults to
-`production`). Find a project ID on the dashboard or in the database; IDs are
-short opaque strings (e.g. `gh6p5a84k3xvv8mdjlkrou7x`).
+All commands target a project (`--project <id>` or `.shh.project`) and an
+environment (`--env <name>` or `.shh.env`, defaulting to `production`). Find a
+project ID on the dashboard or in the database; IDs are short opaque strings
+(e.g. `gh6p5a84k3xvv8mdjlkrou7x`).
 
 | Command                              | Effect                                             |
 | ------------------------------------ | -------------------------------------------------- |
+| `shh link --project <id> [--env <e>]`| Pin the directory to a project/environment.        |
 | `shh pull`                           | Fetch vars + secrets into a file or shell.         |
 | `shh secret list`                    | List secret keys (values are never shown).         |
 | `shh secret get <key>`               | Print one decrypted secret value.                  |
