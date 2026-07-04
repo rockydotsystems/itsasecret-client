@@ -16,6 +16,44 @@ func newSecretCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newSecretSetCmd())
 	cmd.AddCommand(newSecretGetCmd())
+	cmd.AddCommand(newSecretListCmd())
+	return cmd
+}
+
+func newSecretListCmd() *cobra.Command {
+	var (
+		project string
+		env     string
+	)
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List secret keys in an environment (values not shown)",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, session, err := auth.LoadSessionConfig()
+			if err != nil {
+				return err
+			}
+			if project == "" {
+				return fmt.Errorf("--project is required")
+			}
+			if env == "" {
+				env = "production"
+			}
+
+			client := api.NewClient(cfg.APIURL).WithToken(session.Token)
+			keys, err := client.ListSecrets(cmd.Context(), project, env)
+			if err != nil {
+				return err
+			}
+			for _, k := range keys {
+				fmt.Println(k)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&project, "project", "", "project ID (required)")
+	cmd.Flags().StringVar(&env, "env", "", "environment name (default: production)")
 	return cmd
 }
 

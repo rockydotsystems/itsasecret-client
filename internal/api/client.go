@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 
 	"itsasecret.dev/cli/internal/crypto"
 )
@@ -138,6 +139,36 @@ func (c *Client) resolveEnvID(ctx context.Context, projectID, envName string) (s
 		}
 	}
 	return "", fmt.Errorf("environment %q not found in project %s", envName, projectID)
+}
+
+// ListSecrets returns the secret keys in an environment, sorted. Values are
+// never returned by the list route — use `secret get` to reveal one.
+func (c *Client) ListSecrets(ctx context.Context, projectID, envName string) ([]string, error) {
+	envID, err := c.resolveEnvID(ctx, projectID, envName)
+	if err != nil {
+		return nil, err
+	}
+	path := fmt.Sprintf("/api/envs/%s/secrets", envID)
+	resp, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("list secrets: HTTP %d", resp.StatusCode)
+	}
+	var rows []struct {
+		Key string `json:"key"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(rows))
+	for _, r := range rows {
+		keys = append(keys, r.Key)
+	}
+	sort.Strings(keys)
+	return keys, nil
 }
 
 func (c *Client) SetSecret(ctx context.Context, projectID, envName, key, value string) error {
