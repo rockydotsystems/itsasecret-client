@@ -17,7 +17,7 @@ env vars/secrets across environments, populates `.env` files or shell env
 
 ```
 nix develop                    # enter dev shell (go, gopls, golangci-lint)
-nix run .#run -- <args>        # go run ./cmd/itsasecret <args>
+nix run . -- <args>            # run the CLI (default app); also .#dev / .#run
 nix run .#test                 # go test ./...
 nix run .#build                # go build -o itsasecret ./cmd/itsasecret
 nix run .#lint                 # golangci-lint run

@@ -30,20 +30,32 @@ the verification link is printed to the server terminal so the account can be
 verified without email delivery. Unverified accounts are rejected by every
 protected endpoint with `403 Email not verified`.
 
-## Building the CLI
+## Running and building the CLI
 
-From the `client/` directory:
+From the `client/` directory you can run the CLI directly through the flake,
+forwarding arguments after `--`:
 
 ```sh
-nix run .#build             # produces ./itsasecret
+nix run . -- <args>          # default app; .#dev and .#run are equivalent
+nix run . -- secret list --project <project-id>
 ```
 
-The binary is not installed on `PATH` by default. Either reference it by path
-or create an alias for the session:
+Or build a standalone binary:
+
+```sh
+nix run .#build              # produces ./itsasecret
+```
+
+The built binary is not installed on `PATH` by default. Either reference it by
+path or create an alias for the session:
 
 ```sh
 alias shh="$PWD/itsasecret"
 ```
+
+The examples below use `shh`; substitute `nix run . --` or the binary path as
+you prefer. Note that direnv (`.envrc`) requires a real binary path, not the
+`nix run` form or a shell alias.
 
 ## Pointing the CLI at local
 

@@ -17,6 +17,7 @@
             shellHook = ''
               echo ""
               echo "itsasecret-client dev shell"
+              echo "  shh ...                   # CLI, rebuilt each direnv reload (.direnv/bin/shh)"
               echo "  go run ./cmd/itsasecret   # run the CLI"
               echo "  go test ./...             # tests"
               echo "  go build -o itsasecret ./cmd/itsasecret"
@@ -38,8 +39,15 @@
               exec ${cmd}
             '');
           };
+          runCli = ''go run ./cmd/itsasecret "$@"'';
         in {
-          run = app "run" ''go run ./cmd/itsasecret "$@"'';
+          # `nix run .` / `.#default` / `.#dev` / `.#run` all run the CLI,
+          # forwarding args after `--` to the binary, e.g.
+          #   nix run .#default -- pull --project <id> --env production
+          default = app "default" runCli;
+          dev = app "dev" runCli;
+          run = app "run" runCli;
+          shh = app "shh" runCli;
           test = app "test" ''go test ./... "$@"'';
           build = app "build" ''go build -o itsasecret ./cmd/itsasecret "$@"'';
           lint = app "lint" ''golangci-lint run "$@"'';
