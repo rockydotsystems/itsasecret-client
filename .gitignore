@@ -4,3 +4,5 @@ itsasecret
 *.out
 /dist/
 .direnv/
+# We don't actually have env vars - this is just because sometimes we'll pull env vars and it'll show up in the repo
+.env
