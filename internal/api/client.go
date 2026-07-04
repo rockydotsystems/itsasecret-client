@@ -108,6 +108,38 @@ func (c *Client) Pull(ctx context.Context, projectID, envName string) (map[strin
 	return result, nil
 }
 
+// environment is the subset of an environment row the CLI needs to map a
+// human-facing env name to the opaque env ID the secret/var routes key on.
+type environment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// resolveEnvID maps (projectID, envName) to the opaque env ID. The single
+// secret/var routes are keyed by env ID, not project + env name (only /pull is
+// project+name shaped), so every secret/var call resolves the ID first.
+func (c *Client) resolveEnvID(ctx context.Context, projectID, envName string) (string, error) {
+	path := fmt.Sprintf("/api/projects/%s/envs", projectID)
+	resp, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("list envs: HTTP %d", resp.StatusCode)
+	}
+	var envs []environment
+	if err := json.NewDecoder(resp.Body).Decode(&envs); err != nil {
+		return "", err
+	}
+	for _, e := range envs {
+		if e.Name == envName {
+			return e.ID, nil
+		}
+	}
+	return "", fmt.Errorf("environment %q not found in project %s", envName, projectID)
+}
+
 func (c *Client) SetSecret(ctx context.Context, projectID, envName, key, value string) error {
 	if len(c.sessionKey) == 0 {
 		return fmt.Errorf("no session key — cannot encrypt secret")
@@ -116,13 +148,23 @@ func (c *Client) SetSecret(ctx context.Context, projectID, envName, key, value s
 	if err != nil {
 		return fmt.Errorf("encrypt secret: %w", err)
 	}
-	path := fmt.Sprintf("/api/projects/%s/envs/%s/secrets/%s", projectID, envName, key)
-	body := map[string]string{"value": encrypted}
+	envID, err := c.resolveEnvID(ctx, projectID, envName)
+	if err != nil {
+		return err
+	}
+	// cipher defaults to 'session' server-side: the server decrypts with the
+	// transport session key and re-encrypts under the org key.
+	path := fmt.Sprintf("/api/envs/%s/secrets/%s", envID, key)
+	body := map[string]string{"encryptedValue": encrypted}
 	return c.doNoBody(ctx, "PUT", path, body)
 }
 
 func (c *Client) SetVar(ctx context.Context, projectID, envName, key, value string) error {
-	path := fmt.Sprintf("/api/projects/%s/envs/%s/vars/%s", projectID, envName, key)
+	envID, err := c.resolveEnvID(ctx, projectID, envName)
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("/api/envs/%s/vars/%s", envID, key)
 	body := map[string]string{"value": value}
 	return c.doNoBody(ctx, "PUT", path, body)
 }
@@ -131,7 +173,11 @@ func (c *Client) GetSecret(ctx context.Context, projectID, envName, key string) 
 	if len(c.sessionKey) == 0 {
 		return "", fmt.Errorf("no session key — cannot decrypt secret")
 	}
-	path := fmt.Sprintf("/api/projects/%s/envs/%s/secrets/%s", projectID, envName, key)
+	envID, err := c.resolveEnvID(ctx, projectID, envName)
+	if err != nil {
+		return "", err
+	}
+	path := fmt.Sprintf("/api/envs/%s/secrets/%s", envID, key)
 	resp, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
 		return "", err
@@ -141,20 +187,27 @@ func (c *Client) GetSecret(ctx context.Context, projectID, envName, key string) 
 		return "", fmt.Errorf("get secret: HTTP %d", resp.StatusCode)
 	}
 	var out struct {
-		Value string `json:"value"`
+		Key            string `json:"key"`
+		EncryptedValue string `json:"encryptedValue"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return "", err
 	}
-	plaintext, err := crypto.DecryptString(c.sessionKey, out.Value)
+	plaintext, err := crypto.DecryptString(c.sessionKey, out.EncryptedValue)
 	if err != nil {
 		return "", fmt.Errorf("decrypt secret: %w", err)
 	}
 	return plaintext, nil
 }
 
+// GetVar reads a single var. There is no single-var GET route (vars are
+// plaintext), so it lists the env's vars and picks the key.
 func (c *Client) GetVar(ctx context.Context, projectID, envName, key string) (string, error) {
-	path := fmt.Sprintf("/api/projects/%s/envs/%s/vars/%s", projectID, envName, key)
+	envID, err := c.resolveEnvID(ctx, projectID, envName)
+	if err != nil {
+		return "", err
+	}
+	path := fmt.Sprintf("/api/envs/%s/vars", envID)
 	resp, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
 		return "", err
@@ -163,17 +216,27 @@ func (c *Client) GetVar(ctx context.Context, projectID, envName, key string) (st
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("get var: HTTP %d", resp.StatusCode)
 	}
-	var out struct {
+	var vars []struct {
+		Key   string `json:"key"`
 		Value string `json:"value"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&vars); err != nil {
 		return "", err
 	}
-	return out.Value, nil
+	for _, v := range vars {
+		if v.Key == key {
+			return v.Value, nil
+		}
+	}
+	return "", fmt.Errorf("var %q not found", key)
 }
 
 func (c *Client) ForkEnv(ctx context.Context, projectID, envName, newName string) error {
-	path := fmt.Sprintf("/api/projects/%s/envs/%s/fork", projectID, envName)
+	envID, err := c.resolveEnvID(ctx, projectID, envName)
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("/api/projects/%s/envs/%s/fork", projectID, envID)
 	body := map[string]string{"name": newName}
 	resp, err := c.do(ctx, "POST", path, body)
 	if err != nil {
