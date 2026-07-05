@@ -57,6 +57,14 @@ URL persists to the config file, so later commands need no flag.
   (project from `.shh.project`, env from `.shh.env` as set by the last
   `shh link`, defaulting to production), and only pulls of that linked scope
   update the record - one-off `--project`/`--env` overrides don't.
+- `shh auth <token>` - authenticate a headless machine (CI runner, server,
+  container) with a long-lived access token created under Tokens on the
+  website. Tokens look like `shht_<bearer>.<key>`: the bearer half is the
+  session credential, the key half is the transport key that decrypts the
+  org keys stored with the token's session (kind `token` server-side - never
+  rolls, never idles out; lifetime 30 days to 2 years or "does not expire",
+  revocable on the website). No master password is involved. Stored in the
+  same per-server `sessions` map as `shh login` sessions.
 - `shh config` - view/set the API server. Set once per machine (global
   `config.json`), or per repo via a `url =` line in `.shh.project`
   (committed; for self-hosted servers). Bare `shh config` is an interactive

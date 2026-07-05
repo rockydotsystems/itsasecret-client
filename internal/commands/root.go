@@ -18,6 +18,7 @@ func NewRootCmd() *cobra.Command {
 		Version: Version,
 	}
 	cmd.AddCommand(newLoginCmd())
+	cmd.AddCommand(newAuthCmd())
 	cmd.AddCommand(newConfigCmd())
 	cmd.AddCommand(newLinkCmd())
 	cmd.AddCommand(newPullCmd())

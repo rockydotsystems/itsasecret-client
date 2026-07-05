@@ -66,26 +66,51 @@ var ErrUnauthorized = errors.New("session rejected by server")
 // Me returns the logged-in user's email, or ErrUnauthorized when the session
 // token is no longer valid.
 func (c *Client) Me(ctx context.Context) (string, error) {
-	resp, err := c.do(ctx, "GET", "/api/auth/me", nil)
+	details, err := c.MeDetails(ctx)
 	if err != nil {
 		return "", err
 	}
+	return details.Email, nil
+}
+
+// MeDetails is what /api/auth/me reports about the caller: who they are and
+// what kind of session (web/cli rolling session, or long-lived access token)
+// backs the credentials, with its expiry.
+type MeDetails struct {
+	Email            string
+	SessionKind      string
+	SessionExpiresAt time.Time
+}
+
+func (c *Client) MeDetails(ctx context.Context) (*MeDetails, error) {
+	resp, err := c.do(ctx, "GET", "/api/auth/me", nil)
+	if err != nil {
+		return nil, err
+	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return "", ErrUnauthorized
+		return nil, ErrUnauthorized
 	}
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("me: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("me: HTTP %d", resp.StatusCode)
 	}
 	var out struct {
 		User struct {
 			Email string `json:"email"`
 		} `json:"user"`
+		Session struct {
+			Kind      string    `json:"kind"`
+			ExpiresAt time.Time `json:"expiresAt"`
+		} `json:"session"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return "", err
+		return nil, err
 	}
-	return out.User.Email, nil
+	return &MeDetails{
+		Email:            out.User.Email,
+		SessionKind:      out.Session.Kind,
+		SessionExpiresAt: out.Session.ExpiresAt,
+	}, nil
 }
 
 type LoginRequest struct {
