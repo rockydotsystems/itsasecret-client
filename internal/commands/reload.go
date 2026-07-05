@@ -40,7 +40,7 @@ the output with: eval "$(shh reload)"`,
 			if delivery.Mode == localcfg.PullModeFile && !filepath.IsAbs(delivery.Out) {
 				delivery.Out = filepath.Join(filepath.Dir(rs.files.ProjectPath), delivery.Out)
 			}
-			return runPull(cmd.Context(), cfg, session, rs.project, rs.env, delivery, cmd.OutOrStdout())
+			return runPull(cmd.Context(), rs.apiURL(cfg), session, rs.project, rs.env, delivery, cmd.OutOrStdout())
 		},
 	}
 	addScopeFlags(cmd, &scope)

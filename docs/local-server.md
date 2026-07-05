@@ -59,33 +59,40 @@ you prefer. Note that direnv (`.envrc`) requires a real binary path, not the
 
 ## Pointing the CLI at local
 
-The target server is stored per-machine in the CLI config file, so it only
-needs to be set once. Pass `--api` to `login`; it persists the URL alongside
-the session token and transport key.
+The target server is set once per machine with `shh config` — run it bare for
+an interactive menu, or set it directly:
 
 ```sh
-shh login --api http://localhost:3000
+shh config set api http://localhost:3000
+# API server set to http://localhost:3000 for this machine.
+# Run `shh login` to authenticate against it.
+shh login
 # Email:    you@example.com
 # Password: ********
 # Logged in.
 ```
 
-After login, every other command reads the server URL from the config file —
-no `--api` flag is required again:
+Every command reads the server URL from the config from then on:
 
 ```sh
 shh pull   --project <project-id> --env production --shell
 shh secret list --project <project-id>
 ```
 
+A repo can also pin its server by committing an `api =` line in
+`.shh.project` — `shh config set api <url> --project` writes it (or pick
+"this project" in the bare `shh config` menu). The project override beats the
+global config, and `shh config get api` shows which one is in effect.
+
 ### Configuration file
 
-Login writes `config.json` under the user config directory
-(`$XDG_CONFIG_HOME/itsasecret/`, defaulting to `~/.config/itsasecret/`):
+`shh config` and `shh login` write `config.json` under the user config
+directory (`$XDG_CONFIG_HOME/itsasecret/`, defaulting to
+`~/.config/itsasecret/`):
 
 | Field          | Purpose                                                        |
 | -------------- | ------------------------------------------------------------- |
-| `apiUrl`       | Server the CLI targets (set by `login --api`).                |
+| `apiUrl`       | Server the CLI targets (set by `shh config set api`).         |
 | `sessionToken` | Bearer token for the server-side session.                     |
 | `sessionKey`   | ECDH-derived transport key; decrypts secrets returned by pull.|
 | `orgKeys`      | Per-org keys unwrapped at login (transport flow).             |
@@ -95,7 +102,8 @@ touching your real one, override the config directory for the session:
 
 ```sh
 export XDG_CONFIG_HOME=/tmp/itsasecret-dev
-shh login --api http://localhost:3000
+shh config set api http://localhost:3000
+shh login
 ```
 
 ## Linking a directory
@@ -141,6 +149,7 @@ project ID on the dashboard or in the database; IDs are short opaque strings
 
 | Command                              | Effect                                             |
 | ------------------------------------ | -------------------------------------------------- |
+| `shh config [set api <url>]`         | View/set the API server (menu when bare).          |
 | `shh link --project <id> [--env <e>]`| Pin the directory to a project/environment.        |
 | `shh pull`                           | Fetch vars + secrets into a file or shell.         |
 | `shh reload`                         | Pull again, delivered the way the last pull was.   |
@@ -217,10 +226,11 @@ direnv allow
 
 ## Switching back to production
 
-Re-run `login` against the production URL, which overwrites `apiUrl`:
+Point the config back at production and log in again:
 
 ```sh
-shh login --api https://itsasecret.dev
+shh config set api https://itsasecret.dev
+shh login
 ```
 
 Or remove the config file to reset entirely:
@@ -235,7 +245,7 @@ rm ~/.config/itsasecret/config.json
 | ----------------------------------------- | --------------------------------------------------------------------- |
 | `login failed: ... HTTP 401`              | Wrong credentials, or the account does not exist in the local DB.     |
 | `HTTP 403` (`Email not verified`)         | Verify the account first (link is printed to the server terminal).    |
-| `not logged in — run itsasecret login`    | No session in the config file; run `login` (with `--api` for local).  |
+| `not logged in — run itsasecret login`    | No session in the config file; run `shh login` (after `shh config set api` for local). |
 | `environment "<name>" not found`          | The env name does not exist in that project; check `--env`.           |
 | `get secret: HTTP 404`                    | The key does not exist in that environment.                           |
 | Connection refused                        | The `www` dev server is not running on `http://localhost:3000`.       |

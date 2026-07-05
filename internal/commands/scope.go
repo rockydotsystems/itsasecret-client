@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 
 	"github.com/spf13/cobra"
@@ -63,10 +64,11 @@ func (s *scopeFlags) resolveScope() (*resolvedScope, error) {
 	return rs, nil
 }
 
-func (s *scopeFlags) resolve() (project, env string, err error) {
-	rs, err := s.resolveScope()
-	if err != nil {
-		return "", "", err
+// apiURL returns the API base URL for this scope: an `api =` override in the
+// resolved .shh.project wins over the machine-global config.
+func (rs *resolvedScope) apiURL(cfg *config.Config) string {
+	if rs.files.API != "" {
+		return rs.files.API
 	}
-	return rs.project, rs.env, nil
+	return cfg.APIURL
 }

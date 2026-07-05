@@ -43,6 +43,10 @@ resolves to.`,
 			out := cmd.OutOrStdout()
 
 			if project == "" && env == "" {
+				files, err := localcfg.Find(cwd)
+				if err != nil {
+					return err
+				}
 				cfg, session, err := auth.LoadSessionConfig()
 				if err != nil {
 					// Not logged in — show the current state instead.
@@ -52,7 +56,11 @@ resolves to.`,
 					sayln(out, "Run `shh login` to link interactively.")
 					return nil
 				}
-				client := api.NewClient(cfg.APIURL).WithToken(session.Token)
+				apiURL := cfg.APIURL
+				if files.API != "" {
+					apiURL = files.API
+				}
+				client := api.NewClient(apiURL).WithToken(session.Token)
 				return interactiveLink(cmd.Context(), client, cmd.InOrStdin(), out, cwd)
 			}
 
@@ -189,14 +197,10 @@ func interactiveLink(ctx context.Context, client *api.Client, in io.Reader, out 
 	return linkEnv(out, cwd, envs[envIdx].Name)
 }
 
-// selectIndex prompts for one of options with a huh select: a full TUI when
-// the input is a terminal, huh's accessible numbered-prompt mode when it's a
-// pipe or a test reader.
-func selectIndex(ctx context.Context, in io.Reader, out io.Writer, title string, options []huh.Option[int]) (int, error) {
-	var idx int
-	form := huh.NewForm(huh.NewGroup(
-		huh.NewSelect[int]().Title(title).Options(options...).Value(&idx),
-	)).WithInput(in).WithOutput(out)
+// runField runs a single huh field: a full TUI when the input is a terminal,
+// huh's accessible line-prompt mode when it's a pipe or a test reader.
+func runField(ctx context.Context, in io.Reader, out io.Writer, field huh.Field) error {
+	form := huh.NewForm(huh.NewGroup(field)).WithInput(in).WithOutput(out)
 	if f, ok := in.(*os.File); !ok || !term.IsTerminal(f.Fd()) {
 		// Accessible mode reads one line per prompt, but buffers the reader
 		// per field — byte-wise reads keep the rest of a piped script intact
@@ -205,8 +209,18 @@ func selectIndex(ctx context.Context, in io.Reader, out io.Writer, title string,
 	}
 	if err := form.RunWithContext(ctx); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
-			return 0, errors.New("link aborted")
+			return errors.New("aborted")
 		}
+		return err
+	}
+	return nil
+}
+
+// selectIndex prompts for one of options with a huh select.
+func selectIndex(ctx context.Context, in io.Reader, out io.Writer, title string, options []huh.Option[int]) (int, error) {
+	var idx int
+	field := huh.NewSelect[int]().Title(title).Options(options...).Value(&idx)
+	if err := runField(ctx, in, out, field); err != nil {
 		return 0, err
 	}
 	return idx, nil

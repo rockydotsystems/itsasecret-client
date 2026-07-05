@@ -22,15 +22,16 @@ func newForkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, env, err := scope.resolve()
+			rs, err := scope.resolveScope()
 			if err != nil {
 				return err
 			}
+			project, env := rs.project, rs.env
 			if name == "" {
 				return fmt.Errorf("--name is required (new environment name)")
 			}
 
-			client := api.NewClient(cfg.APIURL).WithToken(session.Token)
+			client := api.NewClient(rs.apiURL(cfg)).WithToken(session.Token)
 			if err := client.ForkEnv(cmd.Context(), project, env, name); err != nil {
 				return err
 			}

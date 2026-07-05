@@ -34,12 +34,13 @@ func newVarSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, env, err := scope.resolve()
+			rs, err := scope.resolveScope()
 			if err != nil {
 				return err
 			}
+			project, env := rs.project, rs.env
 
-			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
+			client := api.NewClient(rs.apiURL(cfg)).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			if err := client.SetVar(cmd.Context(), project, env, key, value); err != nil {
 				return err
 			}
@@ -62,12 +63,13 @@ func newVarGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, env, err := scope.resolve()
+			rs, err := scope.resolveScope()
 			if err != nil {
 				return err
 			}
+			project, env := rs.project, rs.env
 
-			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
+			client := api.NewClient(rs.apiURL(cfg)).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			val, err := client.GetVar(cmd.Context(), project, env, args[0])
 			if err != nil {
 				return err

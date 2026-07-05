@@ -31,12 +31,13 @@ func newSecretListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, env, err := scope.resolve()
+			rs, err := scope.resolveScope()
 			if err != nil {
 				return err
 			}
+			project, env := rs.project, rs.env
 
-			client := api.NewClient(cfg.APIURL).WithToken(session.Token)
+			client := api.NewClient(rs.apiURL(cfg)).WithToken(session.Token)
 			keys, err := client.ListSecrets(cmd.Context(), project, env)
 			if err != nil {
 				return err
@@ -66,12 +67,13 @@ func newSecretSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, env, err := scope.resolve()
+			rs, err := scope.resolveScope()
 			if err != nil {
 				return err
 			}
+			project, env := rs.project, rs.env
 
-			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
+			client := api.NewClient(rs.apiURL(cfg)).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			if err := client.SetSecret(cmd.Context(), project, env, key, value); err != nil {
 				return err
 			}
@@ -94,12 +96,13 @@ func newSecretGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, env, err := scope.resolve()
+			rs, err := scope.resolveScope()
 			if err != nil {
 				return err
 			}
+			project, env := rs.project, rs.env
 
-			client := api.NewClient(cfg.APIURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
+			client := api.NewClient(rs.apiURL(cfg)).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			val, err := client.GetSecret(cmd.Context(), project, env, args[0])
 			if err != nil {
 				return err

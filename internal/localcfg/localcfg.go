@@ -5,13 +5,16 @@
 // .shh.project is meant to be committed and holds `key = value` lines:
 //
 //	project = heyq1dpc
+//	api = https://secrets.example.com
 //	pull = file:.env
 //
-// `project` is the project ID; `pull` records how the last `shh pull`
-// delivered values ("shell", or "file:<path>" with the path relative to the
-// .shh.project directory unless absolute) so `shh reload` can repeat it. A
-// legacy file holding just a bare project ID line still parses. Unknown keys
-// are ignored for forward compatibility.
+// `project` is the project ID; `api` optionally pins the API server for this
+// repo (overriding the machine-global config, e.g. for self-hosted servers);
+// `pull` records how the last `shh pull` delivered values ("shell", or
+// "file:<path>" with the path relative to the .shh.project directory unless
+// absolute) so `shh reload` can repeat it. A legacy file holding just a bare
+// project ID line still parses. Unknown keys are ignored for forward
+// compatibility.
 //
 // .shh.env holds the environment name as a single line and stays local
 // (per-developer), so it belongs in .gitignore.
@@ -55,13 +58,14 @@ func (p PullConfig) encode() string {
 
 // Scope is the project/environment resolved from .shh.* files. A zero field
 // means the corresponding file was not found (or was empty). The *Path fields
-// record which file each value came from, for user-facing messages. Pull is
-// the pull config recorded in the same .shh.project the project came from,
-// nil if none was recorded.
+// record which file each value came from, for user-facing messages. Pull and
+// API come from the same .shh.project the project came from; Pull is nil and
+// API empty when not recorded there.
 type Scope struct {
 	Project     string
 	ProjectPath string
 	Pull        *PullConfig
+	API         string
 	Env         string
 	EnvPath     string
 }
@@ -79,12 +83,13 @@ func Find(dir string) (*Scope, error) {
 	for {
 		if scope.Project == "" {
 			p := filepath.Join(dir, ProjectFile)
-			project, pull, err := parseProjectFile(p)
+			pc, err := parseProjectFile(p)
 			if err != nil {
 				return nil, err
 			}
-			if project != "" {
-				scope.Project, scope.ProjectPath, scope.Pull = project, p, pull
+			if pc.Project != "" {
+				scope.Project, scope.ProjectPath = pc.Project, p
+				scope.Pull, scope.API = pc.Pull, pc.API
 			}
 		}
 		if scope.Env == "" {
@@ -108,15 +113,34 @@ func Find(dir string) (*Scope, error) {
 	}
 }
 
-// parseProjectFile reads a .shh.project file. A missing file returns zero
-// values without an error.
-func parseProjectFile(path string) (project string, pull *PullConfig, err error) {
+// projectConfig is the parsed content of a .shh.project file.
+type projectConfig struct {
+	Project string
+	API     string
+	Pull    *PullConfig
+}
+
+func (c *projectConfig) format() string {
+	s := "project = " + c.Project + "\n"
+	if c.API != "" {
+		s += "api = " + c.API + "\n"
+	}
+	if c.Pull != nil {
+		s += "pull = " + c.Pull.encode() + "\n"
+	}
+	return s
+}
+
+// parseProjectFile reads a .shh.project file. A missing file returns a zero
+// config without an error.
+func parseProjectFile(path string) (*projectConfig, error) {
+	pc := &projectConfig{}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil, nil
+			return pc, nil
 		}
-		return "", nil, err
+		return nil, err
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
@@ -126,25 +150,27 @@ func parseProjectFile(path string) (project string, pull *PullConfig, err error)
 		key, value, isKV := strings.Cut(line, "=")
 		if !isKV {
 			// Legacy format: a bare line is the project ID.
-			if project != "" {
-				return "", nil, fmt.Errorf("%s: multiple project values", path)
+			if pc.Project != "" {
+				return nil, fmt.Errorf("%s: multiple project values", path)
 			}
-			project = line
+			pc.Project = line
 			continue
 		}
 		switch key, value = strings.TrimSpace(key), strings.TrimSpace(value); key {
 		case "project":
-			project = value
+			pc.Project = value
+		case "api":
+			pc.API = value
 		case "pull":
-			pull, err = parsePullValue(path, value)
+			pc.Pull, err = parsePullValue(path, value)
 			if err != nil {
-				return "", nil, err
+				return nil, err
 			}
 		default:
 			// Ignore unknown keys so older CLIs tolerate newer files.
 		}
 	}
-	return project, pull, nil
+	return pc, nil
 }
 
 func parsePullValue(path, value string) (*PullConfig, error) {
@@ -157,12 +183,14 @@ func parsePullValue(path, value string) (*PullConfig, error) {
 	return nil, fmt.Errorf(`%s: invalid pull setting %q (expected "shell" or "file:<path>")`, path, value)
 }
 
-func formatProjectFile(project string, pull *PullConfig) string {
-	s := "project = " + project + "\n"
-	if pull != nil {
-		s += "pull = " + pull.encode() + "\n"
+// saveProjectFile writes the config back, skipping the write when the file
+// already says exactly this (so repeated saves don't churn a tracked file).
+func saveProjectFile(path string, pc *projectConfig) error {
+	content := pc.format()
+	if current, err := os.ReadFile(path); err == nil && string(current) == content {
+		return nil
 	}
-	return s
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 // readValue returns the trimmed content of a single-value marker file, or ""
@@ -182,37 +210,49 @@ func readValue(path string) (string, error) {
 	return v, nil
 }
 
-// WriteProject writes .shh.project in dir and returns its path, preserving a
-// recorded pull config if the file already exists.
+// WriteProject writes .shh.project in dir and returns its path, preserving
+// the other recorded settings (api, pull) if the file already exists.
 func WriteProject(dir, project string) (string, error) {
 	path := filepath.Join(dir, ProjectFile)
-	_, pull, err := parseProjectFile(path)
+	pc, err := parseProjectFile(path)
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(path, []byte(formatProjectFile(project, pull)), 0o644); err != nil {
+	pc.Project = project
+	if err := saveProjectFile(path, pc); err != nil {
 		return "", err
 	}
 	return path, nil
 }
 
 // SavePull records the pull config in an existing .shh.project file
-// (identified by its full path, as returned in Scope.ProjectPath). The write
-// is skipped when the file already says exactly this, so repeated pulls (e.g.
-// `pull --shell` from an .envrc on every cd) don't churn a tracked file.
+// (identified by its full path, as returned in Scope.ProjectPath). Repeated
+// identical saves skip the write, so pulls from an .envrc on every cd don't
+// churn a tracked file.
 func SavePull(path string, pull PullConfig) error {
-	project, _, err := parseProjectFile(path)
+	pc, err := parseProjectFile(path)
 	if err != nil {
 		return err
 	}
-	if project == "" {
+	if pc.Project == "" {
 		return fmt.Errorf("%s: no project recorded", path)
 	}
-	content := formatProjectFile(project, &pull)
-	if current, err := os.ReadFile(path); err == nil && string(current) == content {
-		return nil
+	pc.Pull = &pull
+	return saveProjectFile(path, pc)
+}
+
+// SaveAPI records (or, with an empty url, removes) the API server override
+// in an existing .shh.project file.
+func SaveAPI(path, url string) error {
+	pc, err := parseProjectFile(path)
+	if err != nil {
+		return err
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
+	if pc.Project == "" {
+		return fmt.Errorf("%s: no project recorded", path)
+	}
+	pc.API = url
+	return saveProjectFile(path, pc)
 }
 
 // WriteEnv writes .shh.env in dir and returns its path.

@@ -49,10 +49,17 @@ to the config file, so later commands need no flag.
   (project from `.shh.project`, env from `.shh.env` as set by the last
   `shh link`, defaulting to production), and only pulls of that linked scope
   update the record — one-off `--project`/`--env` overrides don't.
+- `shh config` — view/set the API server. Set once per machine (global
+  `config.json`), or per repo via an `api =` line in `.shh.project`
+  (committed; for self-hosted servers). Bare `shh config` is an interactive
+  menu (scope picker + URL input); `shh config set api <url> [--project]` and
+  `shh config get api` are the direct forms. Resolution: `.shh.project` >
+  global > default. `shh login` has **no `--api` flag** — it uses the same
+  resolution.
 - `shh link --project <id> [--env <name>]` — pins a directory to a project/
-  environment by writing `.shh.project` (committed, `key = value` lines; a
-  legacy bare-ID file still parses) and `.shh.env` (local, auto-added to
-  `.gitignore`). Commands resolve scope as flag > `.shh.*` file
+  environment by writing `.shh.project` (committed, `key = value` lines —
+  `project`, optional `api`, optional `pull`; a legacy bare-ID file still
+  parses) and `.shh.env` (local, auto-added to `.gitignore`). Commands resolve scope as flag > `.shh.*` file
   (found by walking up from cwd, each file independently) > `production` for
   env. `shh link` with no flags links interactively when logged in (numbered
   org → project → env picker; env skippable); otherwise it prints the current

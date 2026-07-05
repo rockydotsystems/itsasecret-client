@@ -224,6 +224,83 @@ func TestSavePullIdenticalSkipsWrite(t *testing.T) {
 	}
 }
 
+func TestAPIKeyRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteProject(dir, "heyq1dpc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveAPI(path, "https://secrets.example.com"); err != nil {
+		t.Fatal(err)
+	}
+
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.API != "https://secrets.example.com" {
+		t.Errorf("api = %q, want the saved override", scope.API)
+	}
+}
+
+func TestSaveAPIPreservesPullAndProject(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteProject(dir, "heyq1dpc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SavePull(path, PullConfig{Mode: PullModeShell}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveAPI(path, "https://secrets.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "project = heyq1dpc\napi = https://secrets.example.com\npull = shell\n"
+	if string(data) != want {
+		t.Errorf("file = %q, want %q", data, want)
+	}
+
+	// And the reverse: re-linking and re-recording a pull keep the api line.
+	if _, err := WriteProject(dir, "newproj"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SavePull(path, PullConfig{Mode: PullModeFile, Out: ".env"}); err != nil {
+		t.Fatal(err)
+	}
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.API != "https://secrets.example.com" {
+		t.Errorf("api = %q, want it preserved across WriteProject/SavePull", scope.API)
+	}
+}
+
+func TestSaveAPIEmptyRemovesKey(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteProject(dir, "heyq1dpc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveAPI(path, "https://secrets.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveAPI(path, ""); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "project = heyq1dpc\n" {
+		t.Errorf("file = %q, want the api line removed", data)
+	}
+}
+
 func TestSavePullWithoutProjectErrors(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ProjectFile)
