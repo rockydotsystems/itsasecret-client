@@ -109,28 +109,60 @@ func (c *Client) Pull(ctx context.Context, projectID, envName string) (map[strin
 	return result, nil
 }
 
-// environment is the subset of an environment row the CLI needs to map a
-// human-facing env name to the opaque env ID the secret/var routes key on.
-type environment struct {
+// Org is the subset of an org row the CLI needs.
+type Org struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// Project is the subset of a project row the CLI needs.
+type Project struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Environment is the subset of an environment row the CLI needs, including
+// the opaque env ID the secret/var routes key on.
+type Environment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListOrgs returns the orgs the logged-in user is a member of.
+func (c *Client) ListOrgs(ctx context.Context) ([]Org, error) {
+	var orgs []Org
+	if err := c.getJSON(ctx, "/api/orgs/", "list orgs", &orgs); err != nil {
+		return nil, err
+	}
+	return orgs, nil
+}
+
+// ListProjects returns the projects in an org.
+func (c *Client) ListProjects(ctx context.Context, orgID string) ([]Project, error) {
+	var projects []Project
+	path := fmt.Sprintf("/api/orgs/%s/projects", orgID)
+	if err := c.getJSON(ctx, path, "list projects", &projects); err != nil {
+		return nil, err
+	}
+	return projects, nil
+}
+
+// ListEnvs returns the environments in a project.
+func (c *Client) ListEnvs(ctx context.Context, projectID string) ([]Environment, error) {
+	var envs []Environment
+	path := fmt.Sprintf("/api/projects/%s/envs", projectID)
+	if err := c.getJSON(ctx, path, "list envs", &envs); err != nil {
+		return nil, err
+	}
+	return envs, nil
 }
 
 // resolveEnvID maps (projectID, envName) to the opaque env ID. The single
 // secret/var routes are keyed by env ID, not project + env name (only /pull is
 // project+name shaped), so every secret/var call resolves the ID first.
 func (c *Client) resolveEnvID(ctx context.Context, projectID, envName string) (string, error) {
-	path := fmt.Sprintf("/api/projects/%s/envs", projectID)
-	resp, err := c.do(ctx, "GET", path, nil)
+	envs, err := c.ListEnvs(ctx, projectID)
 	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("list envs: HTTP %d", resp.StatusCode)
-	}
-	var envs []environment
-	if err := json.NewDecoder(resp.Body).Decode(&envs); err != nil {
 		return "", err
 	}
 	for _, e := range envs {
@@ -278,6 +310,20 @@ func (c *Client) ForkEnv(ctx context.Context, projectID, envName, newName string
 		return fmt.Errorf("fork: HTTP %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// getJSON GETs path and decodes the 200 response into out; what names the
+// operation in error messages.
+func (c *Client) getJSON(ctx context.Context, path, what string, out any) error {
+	resp, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("%s: HTTP %d", what, resp.StatusCode)
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 func (c *Client) doNoBody(ctx context.Context, method, path string, body any) error {

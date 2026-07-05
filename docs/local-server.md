@@ -101,18 +101,32 @@ shh login --api http://localhost:3000
 ## Linking a directory
 
 Instead of passing `--project`/`--env` on every command, pin the working
-directory once:
+directory once. When logged in, run it bare to pick interactively:
+
+```sh
+shh link
+# Select a project:
+#   [1] www (gh6p5a84k3xvv8mdjlkrou7x)
+#   [2] client (m2k9d0q1x7v5p8n4j6r3t1wz)
+# Choice [1-2]: 2
+# Select an environment:
+#   [1] production
+#   [2] staging
+# Choice [1-2, empty to skip]: 2
+```
+
+Or non-interactively with flags:
 
 ```sh
 shh link --project <project-id> --env staging
 ```
 
-This writes `.shh.project` (the project ID — commit it) and `.shh.env` (the
-environment name — local to your machine, automatically added to
-`.gitignore`). Commands look for both files in the current directory and its
-parents, so linking a repo root covers every subdirectory. Explicit flags
-always override the files. Run `shh link` with no flags to see what the
-current directory resolves to.
+Either way this writes `.shh.project` (the project ID — commit it) and
+`.shh.env` (the environment name — local to your machine, automatically added
+to `.gitignore`). Commands look for both files in the current directory and
+its parents, so linking a repo root covers every subdirectory. Explicit flags
+always override the files. When not logged in, bare `shh link` prints what
+the current directory resolves to.
 
 ## Command reference
 

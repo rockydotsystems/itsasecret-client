@@ -43,7 +43,9 @@ to the config file, so later commands need no flag.
   environment by writing `.shh.project` (committed) and `.shh.env` (local,
   auto-added to `.gitignore`). Commands resolve scope as flag > `.shh.*` file
   (found by walking up from cwd, each file independently) > `production` for
-  env. `shh link` with no flags prints the current resolution.
+  env. `shh link` with no flags links interactively when logged in (numbered
+  org → project → env picker; env skippable); otherwise it prints the current
+  resolution.
 - Can populate a file (default `.env`) with exported secret values.
 - Can do most things the website can: set values, view them, fork environments, etc.
 - Project IDs are short opaque IDs (nanoid-style, e.g. `heyq1dpc`). Environment selected by flag/branch-name, defaults to `production`.
