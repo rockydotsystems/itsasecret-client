@@ -40,7 +40,15 @@ URL persists to the config file, so later commands need no flag.
   a time (secrets encrypted client-side, vars plaintext); there is
   deliberately **no bulk `push`**. Read back with `shh secret get <key>` /
   `shh var get <key>`.
-- `shh pull --shell --project <project-id>` — populate env vars directly into shell (for `.envrc`/direnv).
+- `shh pull --shell --project <project-id>` — populate env vars directly into
+  shell (for `.envrc`/direnv). `--shell` takes an optional dialect
+  (`--shell=posix|fish|nu|pwsh`; nu emits JSON for
+  `load-env (... | from json)` since nushell has no eval); bare `--shell`
+  auto-detects from `$SHELL`, except inside direnv (`DIRENV_IN_ENVRC`) where
+  POSIX is forced because `.envrc` is always bash. Explicit dialects are
+  recorded as `pull = shell:<dialect>`; bare auto records `pull = shell` so
+  reload re-detects for its own context. The written `.env` file is always
+  POSIX.
 - `shh reload` — pull again, delivered the way the last `shh pull` here was.
   `pull` records its delivery in `.shh.project` (`pull = shell` or
   `pull = file:<path>`, path relative to the `.shh.project` dir), so reload

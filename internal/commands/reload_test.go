@@ -195,6 +195,103 @@ func TestReloadShellMode(t *testing.T) {
 	}
 }
 
+func TestWriteExportsDialects(t *testing.T) {
+	vars := map[string]string{"FOO": "it's a $ecret\\"}
+	cases := map[string]string{
+		"posix": `export FOO='it'\''s a $ecret\'` + "\n",
+		"fish":  `set -gx FOO 'it\'s a $ecret\\'` + "\n",
+		"pwsh":  `$env:FOO = 'it''s a $ecret\'` + "\n",
+		"nu":    `{"FOO":"it's a $ecret\\"}` + "\n",
+	}
+	for dialect, want := range cases {
+		var buf strings.Builder
+		if err := writeExports(&buf, vars, dialect); err != nil {
+			t.Fatalf("%s: %v", dialect, err)
+		}
+		if buf.String() != want {
+			t.Errorf("%s = %q, want %q", dialect, buf.String(), want)
+		}
+	}
+}
+
+func TestDetectShellDialect(t *testing.T) {
+	t.Setenv("DIRENV_IN_ENVRC", "")
+	for shellPath, want := range map[string]string{
+		"/bin/bash":                       "posix",
+		"/usr/bin/zsh":                    "posix",
+		"/usr/bin/fish":                   "fish",
+		"/run/current-system/sw/bin/nu":   "nu",
+		"/usr/local/bin/pwsh":             "pwsh",
+		"":                                "posix",
+	} {
+		t.Setenv("SHELL", shellPath)
+		if got := detectShellDialect(); got != want {
+			t.Errorf("SHELL=%q → %q, want %q", shellPath, got, want)
+		}
+	}
+	// direnv always evaluates .envrc with bash, whatever $SHELL says.
+	t.Setenv("SHELL", "/run/current-system/sw/bin/nu")
+	t.Setenv("DIRENV_IN_ENVRC", "1")
+	if got := detectShellDialect(); got != "posix" {
+		t.Errorf("inside direnv → %q, want posix", got)
+	}
+}
+
+func TestPullShellDialectFlagRecordsAndEmits(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if _, err := localcfg.WriteProject(dir, "proj1"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "", "pull", "--shell=fish")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(out, "set -gx FOO 'bar'") {
+		t.Errorf("expected fish output, got:\n%s", out)
+	}
+	want := "project = proj1\npull = shell:fish\n"
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != want {
+		t.Errorf("%s = %q, want %q", localcfg.ProjectFile, got, want)
+	}
+
+	// Reload replays the recorded dialect.
+	out, err = runCmd(t, "", "reload")
+	if err != nil {
+		t.Fatalf("reload failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(out, "set -gx FOO 'bar'") {
+		t.Errorf("expected reload to replay fish output, got:\n%s", out)
+	}
+}
+
+func TestPullShellAutoUsesLoginShell(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	t.Setenv("SHELL", "/run/current-system/sw/bin/nu")
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if _, err := localcfg.WriteProject(dir, "proj1"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "", "pull", "--shell")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(out, `"FOO":"bar"`) {
+		t.Errorf("expected nu JSON output, got:\n%s", out)
+	}
+	// Auto stays auto in the record: reload re-detects for its own context.
+	want := "project = proj1\npull = shell\n"
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != want {
+		t.Errorf("%s = %q, want %q", localcfg.ProjectFile, got, want)
+	}
+}
+
 func TestReloadWithoutRecordedModeErrors(t *testing.T) {
 	srv := startFakeServer(t)
 	setupConfig(t, srv.URL, true)

@@ -26,11 +26,15 @@ func startFakeServer(t *testing.T) *httptest.Server {
 		}
 	}
 	requireAuth := func(w http.ResponseWriter, r *http.Request) bool {
-		if r.Header.Get("Authorization") != "Bearer test-token" {
+		switch r.Header.Get("Authorization") {
+		// "rotated-token" is what the fake pull handler issues, so it stays
+		// valid for follow-up commands in the same test.
+		case "Bearer test-token", "Bearer rotated-token":
+			return true
+		default:
 			w.WriteHeader(http.StatusUnauthorized)
 			return false
 		}
-		return true
 	}
 
 	mux := http.NewServeMux()
@@ -133,6 +137,9 @@ func setupConfig(t *testing.T, apiURL string, loggedIn bool) {
 	t.Helper()
 	cfgHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	// Pin --shell auto-detection so tests don't depend on the host's shell.
+	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv("DIRENV_IN_ENVRC", "")
 	dir := filepath.Join(cfgHome, "itsasecret")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)

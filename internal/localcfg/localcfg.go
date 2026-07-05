@@ -48,11 +48,17 @@ type PullConfig struct {
 	// Out is the destination path for PullModeFile, relative to the
 	// .shh.project directory unless absolute.
 	Out string
+	// Shell is the explicit dialect for PullModeShell ("posix", "fish",
+	// "nu", …); empty means auto-detect at delivery time.
+	Shell string
 }
 
 func (p PullConfig) encode() string {
 	if p.Mode == PullModeFile {
 		return "file:" + p.Out
+	}
+	if p.Shell != "" {
+		return string(PullModeShell) + ":" + p.Shell
 	}
 	return string(p.Mode)
 }
@@ -178,10 +184,13 @@ func parsePullValue(path, value string) (*PullConfig, error) {
 	if value == string(PullModeShell) {
 		return &PullConfig{Mode: PullModeShell}, nil
 	}
+	if dialect, ok := strings.CutPrefix(value, string(PullModeShell)+":"); ok && dialect != "" {
+		return &PullConfig{Mode: PullModeShell, Shell: dialect}, nil
+	}
 	if out, ok := strings.CutPrefix(value, "file:"); ok && out != "" {
 		return &PullConfig{Mode: PullModeFile, Out: out}, nil
 	}
-	return nil, fmt.Errorf(`%s: invalid pull setting %q (expected "shell" or "file:<path>")`, path, value)
+	return nil, fmt.Errorf(`%s: invalid pull setting %q (expected "shell", "shell:<dialect>" or "file:<path>")`, path, value)
 }
 
 // saveProjectFile writes the config back, skipping the write when the file

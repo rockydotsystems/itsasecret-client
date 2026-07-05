@@ -190,11 +190,14 @@ Load it into the current shell with `source .env`.
 
 ### Shell (stdout)
 
-`--shell` writes `export` lines to stdout instead of a file, for use with
-`eval`:
+`--shell` writes shell-appropriate output to stdout instead of a file. Bare
+`--shell` picks the dialect from `$SHELL` (POSIX inside direnv, where
+`.envrc` is always bash); force one with `--shell=posix|fish|nu|pwsh`:
 
 ```sh
-eval "$(shh pull --project <project-id> --env production --shell)"
+eval "$(shh pull --shell)"                   # bash/zsh
+eval (shh pull --shell)                      # fish → set -gx KEY '…'
+load-env (shh pull --shell | from json)      # nushell → JSON (nu has no eval)
 ```
 
 ### Reloading

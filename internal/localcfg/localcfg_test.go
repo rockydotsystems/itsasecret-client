@@ -136,8 +136,34 @@ func TestFindShellPullMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if scope.Pull == nil || scope.Pull.Mode != PullModeShell {
-		t.Errorf("pull = %+v, want shell", scope.Pull)
+	if scope.Pull == nil || scope.Pull.Mode != PullModeShell || scope.Pull.Shell != "" {
+		t.Errorf("pull = %+v, want shell (auto dialect)", scope.Pull)
+	}
+}
+
+func TestShellDialectRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteProject(dir, "heyq1dpc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SavePull(path, PullConfig{Mode: PullModeShell, Shell: "fish"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "project = heyq1dpc\npull = shell:fish\n"; string(data) != want {
+		t.Errorf("file = %q, want %q", data, want)
+	}
+
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.Pull == nil || scope.Pull.Mode != PullModeShell || scope.Pull.Shell != "fish" {
+		t.Errorf("pull = %+v, want shell:fish", scope.Pull)
 	}
 }
 
