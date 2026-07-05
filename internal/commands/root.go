@@ -7,10 +7,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version is stamped by the release build via
+// -ldflags "-X itsasecret.dev/cli/internal/commands.Version=<rev>".
+var Version = "dev"
+
 func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "itsasecret",
-		Short: "Sync env vars & secrets across environments",
+		Use:     "itsasecret",
+		Short:   "Sync env vars & secrets across environments",
+		Version: Version,
 	}
 	cmd.AddCommand(newLoginCmd())
 	cmd.AddCommand(newConfigCmd())

@@ -129,6 +129,17 @@ client/
     commands/            # cobra command tree (pull, secret, var, fork, login, link, ...)
 ```
 
+## Releases
+
+Every push to `main` runs `.github/workflows/release.yml` on a Blacksmith
+runner: cross-compiles `itsasecret_{linux,darwin}_{amd64,arm64}` (version
+stamped into `internal/commands.Version` via ldflags), writes
+`checksums.txt` + `version.json`, and uploads straight to the Railway
+bucket (`cli/latest/` prefix) — no GitHub artifacts. The `BUCKET_*` repo
+secrets hold the bucket credentials. Users install via
+`curl -fsSL https://itsasecret.dev/install.sh | sh` (served by www, which
+redirects `/api/dl/<name>` to presigned bucket URLs).
+
 ## Version control
 
 This repo uses **jj** (Jujutsu). Use `jj new` to create new revisions — do not

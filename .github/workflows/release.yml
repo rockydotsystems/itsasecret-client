@@ -1,0 +1,51 @@
+name: Release binaries
+
+on:
+  push:
+    branches: [main]
+
+# A newer push to main supersedes an in-flight build of the latest channel.
+concurrency:
+  group: release-latest
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: Build and upload to bucket
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: useblacksmith/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Cross-compile binaries
+        run: |
+          version="$(git rev-parse --short HEAD)"
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os="${target%/*}" arch="${target#*/}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -trimpath \
+                -ldflags "-s -w -X itsasecret.dev/cli/internal/commands.Version=${version}" \
+                -o "dist/itsasecret_${os}_${arch}" ./cmd/itsasecret
+          done
+          (cd dist && sha256sum itsasecret_* > checksums.txt)
+          printf '{"version":"%s","commit":"%s","builtAt":"%s"}\n' \
+            "$version" "$(git rev-parse HEAD)" "$(date -u +%FT%TZ)" > dist/version.json
+
+      # Straight to the Railway bucket — no GitHub artifacts. The www app
+      # serves these via presigned redirects at /api/dl/<name>.
+      - name: Upload to bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUCKET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # Newer aws-cli versions send CRC checksums some S3-compatible
+          # stores reject; only compute them when the API requires it.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          aws s3 cp dist/ "s3://${{ secrets.BUCKET_NAME }}/cli/latest/" \
+            --recursive --endpoint-url "${{ secrets.BUCKET_ENDPOINT }}"
