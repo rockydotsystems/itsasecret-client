@@ -6,14 +6,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
-// StoredSession is one server's session as persisted in config.json. Key
-// material is base64-encoded; decoding lives in the auth package.
+// StoredSession is one server's session as persisted in config.json. Token
+// and SessionKey are short-lived (the session rolls and expires within
+// minutes of inactivity); WrappedOrgKeys are wrapped under the user's
+// master-password-derived key, so nothing long-lived in this file is usable
+// without the master password.
 type StoredSession struct {
-	Token      string            `json:"token"`
-	SessionKey string            `json:"sessionKey,omitempty"`
-	OrgKeys    map[string]string `json:"orgKeys,omitempty"`
+	Token      string    `json:"token"`
+	ExpiresAt  time.Time `json:"expiresAt,omitempty"`
+	Email      string    `json:"email,omitempty"`
+	SessionKey string    `json:"sessionKey,omitempty"`
+	// WrappedOrgKeys holds each org's key wrapped under the master password.
+	WrappedOrgKeys map[string]string `json:"wrappedOrgKeys,omitempty"`
+	// LegacyOrgKeys were stored UNWRAPPED by earlier versions; Load scrubs
+	// them and they are never written again.
+	LegacyOrgKeys map[string]string `json:"orgKeys,omitempty"`
+}
+
+// Expired reports whether the stored session's token is past its expiry. A
+// missing expiry (pre-rolling-session configs) counts as expired so the next
+// command re-authenticates into a rolling session.
+func (s StoredSession) Expired() bool {
+	return s.ExpiresAt.IsZero() || time.Now().After(s.ExpiresAt)
 }
 
 type Config struct {
@@ -84,16 +101,23 @@ func Load() (*Config, error) {
 		cfg.APIURL = "https://itsasecret.dev"
 	}
 	// Migrate a pre-multi-session config: the flat session belonged to the
-	// configured server. Persisted by the next Save.
+	// configured server. Its org keys were stored unwrapped — discard them.
+	// Persisted by the next Save.
 	if cfg.LegacySessionToken != "" {
 		if _, ok := cfg.Session(cfg.APIURL); !ok {
 			cfg.SetSession(cfg.APIURL, StoredSession{
 				Token:      cfg.LegacySessionToken,
 				SessionKey: cfg.LegacySessionKey,
-				OrgKeys:    cfg.LegacyOrgKeys,
 			})
 		}
 		cfg.LegacySessionToken, cfg.LegacySessionKey, cfg.LegacyOrgKeys = "", "", nil
+	}
+	// Scrub unwrapped org keys stored by earlier versions.
+	for url, s := range cfg.Sessions {
+		if s.LegacyOrgKeys != nil {
+			s.LegacyOrgKeys = nil
+			cfg.Sessions[url] = s
+		}
 	}
 	return &cfg, nil
 }

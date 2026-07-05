@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
@@ -184,7 +185,7 @@ func TestConfigMenuShowExpiredSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config menu failed: %v\noutput:\n%s", err, out)
 	}
-	if !strings.Contains(out, srv.URL+" — session expired — run `shh login`") {
+	if !strings.Contains(out, srv.URL+" — session expired — the next command asks for your master password") {
 		t.Errorf("expected an expired-session line, got:\n%s", out)
 	}
 }
@@ -243,7 +244,11 @@ func addSessionToken(t *testing.T, apiURL, token string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.SetSession(apiURL, config.StoredSession{Token: token})
+	cfg.SetSession(apiURL, config.StoredSession{
+		Token:     token,
+		Email:     "you@example.com",
+		ExpiresAt: time.Now().Add(20 * time.Minute),
+	})
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}

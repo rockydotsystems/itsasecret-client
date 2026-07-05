@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"itsasecret.dev/cli/internal/auth"
+	"itsasecret.dev/cli/internal/api"
 	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 
@@ -74,22 +74,24 @@ func (rs *resolvedScope) apiURL(cfg *config.Config) string {
 	return cfg.APIURL
 }
 
-// resolveSession resolves the scope, the effective API URL, and the stored
-// session for that server — the preamble shared by every authenticated,
+// resolveClient resolves the scope and the effective server URL, ensures a
+// live session for it (prompting for the master password when the rolling
+// session has idled out), and returns a ready API client that persists
+// rolled tokens — the preamble shared by every authenticated,
 // environment-scoped command.
-func (s *scopeFlags) resolveSession() (*resolvedScope, string, *auth.Session, error) {
+func (s *scopeFlags) resolveClient(cmd *cobra.Command) (*resolvedScope, *api.Client, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 	rs, err := s.resolveScope()
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 	apiURL := rs.apiURL(cfg)
-	session, err := auth.SessionFor(cfg, apiURL)
+	session, err := ensureSession(cmd.Context(), cmd, cfg, apiURL)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
-	return rs, apiURL, session, nil
+	return rs, clientFor(cfg, apiURL, session), nil
 }

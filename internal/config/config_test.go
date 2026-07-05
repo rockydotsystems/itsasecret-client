@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func writeConfigFile(t *testing.T, content string) {
@@ -33,11 +35,20 @@ func TestLoadMigratesLegacySession(t *testing.T) {
 		t.Fatal(err)
 	}
 	s, ok := cfg.Session("http://localhost:3000")
-	if !ok || s.Token != "legacy-token" || s.SessionKey != "a2V5" || s.OrgKeys["org1"] != "b2s" {
-		t.Errorf("migrated session = %+v (found %v), want the legacy values under the configured URL", s, ok)
+	if !ok || s.Token != "legacy-token" || s.SessionKey != "a2V5" {
+		t.Errorf("migrated session = %+v (found %v), want the legacy token/key under the configured URL", s, ok)
+	}
+	// Legacy org keys were stored unwrapped — they must NOT survive migration.
+	if len(s.LegacyOrgKeys) != 0 || len(s.WrappedOrgKeys) != 0 {
+		t.Errorf("migrated session carries org keys (%+v) — plaintext keys must be discarded", s)
 	}
 	if cfg.LegacySessionToken != "" {
 		t.Error("legacy fields should be cleared after migration")
+	}
+	// A flat session has no expiry — it must count as expired so the next
+	// command re-authenticates into a rolling session.
+	if !s.Expired() {
+		t.Error("migrated legacy session should be treated as expired")
 	}
 
 	// Saving persists the migrated shape without the legacy fields.
@@ -97,6 +108,44 @@ func TestSessionLookupNormalizesURL(t *testing.T) {
 	}
 	if s, ok := cfg.Session(" https://itsasecret.dev/ "); !ok || s.Token != "tok" {
 		t.Errorf("lookup with whitespace/slash failed: %+v (found %v)", s, ok)
+	}
+}
+
+func TestLoadScrubsPlaintextOrgKeys(t *testing.T) {
+	writeConfigFile(t, `{
+		"apiUrl": "http://localhost:3000",
+		"sessions": {"http://localhost:3000": {"token": "tok", "orgKeys": {"org1": "plaintextkey"}}}
+	}`)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _ := cfg.Session("http://localhost:3000")
+	if len(s.LegacyOrgKeys) != 0 {
+		t.Errorf("plaintext org keys survived load: %+v", s.LegacyOrgKeys)
+	}
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "itsasecret", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "" && strings.Contains(string(data), "plaintextkey") {
+		t.Error("plaintext org keys persisted through save")
+	}
+}
+
+func TestStoredSessionExpiry(t *testing.T) {
+	if !(StoredSession{Token: "t"}).Expired() {
+		t.Error("session without expiry should count as expired")
+	}
+	if (StoredSession{Token: "t", ExpiresAt: time.Now().Add(time.Minute)}).Expired() {
+		t.Error("future expiry should not be expired")
+	}
+	if !(StoredSession{Token: "t", ExpiresAt: time.Now().Add(-time.Minute)}).Expired() {
+		t.Error("past expiry should be expired")
 	}
 }
 

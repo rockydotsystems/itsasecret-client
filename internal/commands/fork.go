@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 
-	"itsasecret.dev/cli/internal/api"
 
 	"github.com/spf13/cobra"
 )
@@ -17,7 +16,7 @@ func newForkCmd() *cobra.Command {
 		Use:   "fork",
 		Short: "Fork an environment (e.g. production → staging)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
@@ -25,8 +24,6 @@ func newForkCmd() *cobra.Command {
 			if name == "" {
 				return fmt.Errorf("--name is required (new environment name)")
 			}
-
-			client := api.NewClient(apiURL).WithToken(session.Token)
 			if err := client.ForkEnv(cmd.Context(), project, env, name); err != nil {
 				return err
 			}

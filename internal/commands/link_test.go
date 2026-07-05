@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"itsasecret.dev/cli/internal/crypto"
 	"itsasecret.dev/cli/internal/localcfg"
 )
 
@@ -38,6 +40,38 @@ func startFakeServer(t *testing.T) *httptest.Server {
 			return
 		}
 		writeJSON(w, map[string]any{"user": map[string]string{"email": "you@example.com"}})
+	})
+	mux.HandleFunc("POST /api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Email        string `json:"email"`
+			Password     string `json:"password"`
+			ClientPubkey string `json:"clientPubkey"`
+			Client       string `json:"client"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Password != "hunter2" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		// Real ECDH handshake so the client derives a usable session key.
+		priv, err := crypto.GenerateKeyPair()
+		if err != nil {
+			t.Errorf("fake login keypair: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		serverPub, err := crypto.PublicKeyToBase64(priv.PublicKey())
+		if err != nil {
+			t.Errorf("fake login pubkey: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{
+			"token":                "test-token",
+			"serverPubkey":         serverPub,
+			"orgKeys":              map[string]string{},
+			"masterWrappedOrgKeys": map[string]string{"org1": "master-wrapped-blob"},
+			"sessionExpiresAt":     time.Now().Add(30 * time.Minute).UTC().Format(time.RFC3339),
+		})
 	})
 	mux.HandleFunc("GET /api/orgs/{$}", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAuth(w, r) {
@@ -76,6 +110,9 @@ func startFakeServer(t *testing.T) *httptest.Server {
 		if !requireAuth(w, r) {
 			return
 		}
+		// Rolling sessions: successful responses carry a fresh token.
+		w.Header().Set("X-New-Session-Token", "rotated-token")
+		w.Header().Set("X-Session-Expires-At", time.Now().Add(30*time.Minute).UTC().Format(time.RFC3339))
 		writeJSON(w, map[string]any{
 			"vars": []map[string]string{
 				{"key": "FOO", "value": "bar"},
@@ -103,7 +140,11 @@ func setupConfig(t *testing.T, apiURL string, loggedIn bool) {
 	cfg := map[string]any{"apiUrl": apiURL}
 	if loggedIn {
 		cfg["sessions"] = map[string]any{
-			apiURL: map[string]string{"token": "test-token"},
+			apiURL: map[string]any{
+				"token":     "test-token",
+				"email":     "you@example.com",
+				"expiresAt": time.Now().Add(20 * time.Minute).UTC().Format(time.RFC3339Nano),
+			},
 		}
 	}
 	data, err := json.Marshal(cfg)

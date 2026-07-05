@@ -23,7 +23,7 @@ to the same place from anywhere in the tree. For a shell-mode reload, load
 the output with: eval "$(shh reload)"`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
@@ -35,7 +35,7 @@ the output with: eval "$(shh reload)"`,
 			if delivery.Mode == localcfg.PullModeFile && !filepath.IsAbs(delivery.Out) {
 				delivery.Out = filepath.Join(filepath.Dir(rs.files.ProjectPath), delivery.Out)
 			}
-			return runPull(cmd.Context(), apiURL, session, rs.project, rs.env, delivery, cmd.OutOrStdout())
+			return runPull(cmd.Context(), client, rs.project, rs.env, delivery, cmd.OutOrStdout())
 		},
 	}
 	addScopeFlags(cmd, &scope)

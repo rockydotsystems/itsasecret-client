@@ -79,7 +79,20 @@ URL persists to the config file, so later commands need no flag.
 
 ## Key decisions (from docs/)
 
-- **Auth**: master password → Argon2id KDF → derive key → unwrap org shared key. CLI non-interactive auth needs a long-lived scoped token after `shh login` (stores token + cached key locally) so `.envrc` usage doesn't prompt every shell load.
+- **Auth**: master password → Argon2id KDF (server-side at login) → unwrap org
+  shared keys. CLI sessions are **rolling** (server kind='cli'): valid 30
+  minutes, and every successful command's response carries a fresh token
+  (`X-New-Session-Token` + `X-Session-Expires-At`; old token keeps a 60s
+  grace window) which the client persists immediately (`clientFor` token
+  saver — losing it locks the session out). After ~30 idle minutes the next
+  command prompts inline for the master password (`ensureSession` →
+  `promptLogin`; email is remembered per server) and the full re-login also
+  refreshes org keys. Non-TTY contexts (direnv/scripts) never prompt — they
+  fail with "session expired — run any shh command in a terminal to unlock".
+- **Local storage security**: config.json never holds unwrapped org keys —
+  only master-password-wrapped blobs (`wrappedOrgKeys`, from login's
+  `masterWrappedOrgKeys`); legacy plaintext `orgKeys` are scrubbed on load.
+  The stored token + transport sessionKey are only useful for ≤30 minutes.
 - **Transport**: per-session ECDH key negotiated at login; server re-encrypts secrets with it. CLI holds the session key to decrypt.
 - **RBAC roles**: `read`, `write`, `admin` at environment level.
 

@@ -93,7 +93,14 @@ directory (`$XDG_CONFIG_HOME/itsasecret/`, defaulting to
 | Field      | Purpose                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------ |
 | `apiUrl`   | Server the CLI targets by default (set by `shh config set url`).                                  |
-| `sessions` | Per-server sessions keyed by API URL — token, ECDH transport key, unwrapped org keys. Logging in to local doesn't disturb your production session (or vice versa). |
+| `sessions` | Per-server sessions keyed by API URL — rolling token + expiry, account email, ECDH transport key, and org keys **wrapped under your master password** (never plaintext). Logging in to local doesn't disturb your production session (or vice versa). |
+
+Sessions roll: every successful command refreshes the token, valid for 30
+minutes. After ~30 idle minutes the next command asks for your master
+password inline (email is remembered) and re-unlocks — this also refreshes
+org keys, so newly joined orgs appear. Non-interactive contexts (direnv,
+scripts) can't prompt; they fail with a clear message until you run any shh
+command in a terminal.
 
 The file is written with `0600` permissions. To use a throwaway config without
 touching your real one, override the config directory for the session:
@@ -246,6 +253,7 @@ rm ~/.config/itsasecret/config.json
 | `login failed: ... HTTP 401`              | Wrong credentials, or the account does not exist in the local DB.     |
 | `HTTP 403` (`Email not verified`)         | Verify the account first (link is printed to the server terminal).    |
 | `not logged in to <url> — run shh login`  | No session for that server; run `shh login` (after `shh config set url` for local). |
+| `session for <url> expired — run any shh command in a terminal` | Idle >30 min in a non-interactive context (e.g. direnv); any interactive shh command re-prompts your master password and unlocks. |
 | `environment "<name>" not found`          | The env name does not exist in that project; check `--env`.           |
 | `get secret: HTTP 404`                    | The key does not exist in that environment.                           |
 | Connection refused                        | The `www` dev server is not running on `http://localhost:3000`.       |

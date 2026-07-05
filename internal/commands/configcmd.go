@@ -125,18 +125,25 @@ func setGlobalURL(out io.Writer, cfg *config.Config, serverURL string) error {
 // (via /api/auth/me) and describes the result, instead of guessing at a
 // login hint.
 func sessionStatus(ctx context.Context, cfg *config.Config, serverURL string) string {
+	stored, ok := cfg.Session(serverURL)
+	if !ok || stored.Token == "" {
+		return "not logged in — run `shh login`"
+	}
+	if stored.Expired() {
+		return "session idle-expired — the next command asks for your master password"
+	}
 	session, err := auth.SessionFor(cfg, serverURL)
 	if err != nil {
-		return "not logged in — run `shh login`"
+		return fmt.Sprintf("stored session unreadable (%v)", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	email, err := api.NewClient(serverURL).WithToken(session.Token).Me(ctx)
+	email, err := clientFor(cfg, serverURL, session).Me(ctx)
 	switch {
 	case err == nil:
 		return "logged in as " + email + " (session verified)"
 	case errors.Is(err, api.ErrUnauthorized):
-		return "session expired — run `shh login`"
+		return "session expired — the next command asks for your master password"
 	default:
 		return fmt.Sprintf("couldn't verify session (%v)", err)
 	}

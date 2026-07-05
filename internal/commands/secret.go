@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 
-	"itsasecret.dev/cli/internal/api"
 
 	"github.com/spf13/cobra"
 )
@@ -26,13 +25,11 @@ func newSecretListCmd() *cobra.Command {
 		Short: "List secret keys in an environment (values not shown)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
 			project, env := rs.project, rs.env
-
-			client := api.NewClient(apiURL).WithToken(session.Token)
 			keys, err := client.ListSecrets(cmd.Context(), project, env)
 			if err != nil {
 				return err
@@ -58,13 +55,11 @@ func newSecretSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
 			project, env := rs.project, rs.env
-
-			client := api.NewClient(apiURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			if err := client.SetSecret(cmd.Context(), project, env, key, value); err != nil {
 				return err
 			}
@@ -83,13 +78,11 @@ func newSecretGetCmd() *cobra.Command {
 		Short: "Get a single secret value (decrypted)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
 			project, env := rs.project, rs.env
-
-			client := api.NewClient(apiURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			val, err := client.GetSecret(cmd.Context(), project, env, args[0])
 			if err != nil {
 				return err

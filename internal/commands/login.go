@@ -4,23 +4,25 @@ import (
 	"fmt"
 	"os"
 
-	"itsasecret.dev/cli/internal/api"
 	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
 func newLoginCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Authenticate and store a session token locally",
-		Long: `Authenticate and store a session token locally.
+		Short: "Authenticate and start a rolling session for this server",
+		Long: `Authenticate and start a rolling session for this server.
 
-The server to log in to comes from an ` + "`url =`" + ` line in ` + localcfg.ProjectFile + `
-(if the current directory tree has one) or the machine-global config —
-change either with ` + "`shh config`" + `.`,
+The server comes from a ` + "`url =`" + ` line in ` + localcfg.ProjectFile + ` (if the current
+directory tree has one) or the machine-global config — change either with
+` + "`shh config`" + `. Sessions are per-server and roll: every successful command
+refreshes the session, and after ~30 idle minutes the next command asks for
+your master password again.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load()
@@ -35,30 +37,36 @@ change either with ` + "`shh config`" + `.`,
 			if err != nil {
 				return err
 			}
+			out := cmd.OutOrStdout()
 			apiURL := cfg.APIURL
 			if files.URL != "" {
 				apiURL = files.URL
-				fmt.Printf("Logging in to %s (from %s)\n", apiURL, files.ProjectPath)
+				say(out, "Logging in to %s (from %s)\n", apiURL, files.ProjectPath)
 			} else {
-				fmt.Printf("Logging in to %s\n", apiURL)
+				say(out, "Logging in to %s\n", apiURL)
 			}
-			fmt.Print("Email: ")
-			var email string
-			fmt.Scanln(&email)
-			fmt.Print("Password: ")
-			var password string
-			fmt.Scanln(&password)
 
-			client := api.NewClient(apiURL)
-			session, err := auth.Login(cmd.Context(), client, email, password)
-			if err != nil {
-				return fmt.Errorf("login failed: %w", err)
+			// Prefill the email from a previous session on this server.
+			stored, _ := cfg.Session(apiURL)
+			email := stored.Email
+			field := huh.NewInput().Title("Email").Value(&email).Validate(func(s string) error {
+				if s == "" {
+					return fmt.Errorf("enter the account email")
+				}
+				return nil
+			})
+			if err := runField(cmd.Context(), cmd.InOrStdin(), out, field); err != nil {
+				return err
 			}
-			// Sessions are per-server; other servers' logins are untouched.
-			if err := auth.SaveSession(cfg, apiURL, session); err != nil {
+
+			session, email, err := promptLogin(cmd.Context(), cmd, apiURL, email)
+			if err != nil {
+				return err
+			}
+			if err := auth.SaveSession(cfg, apiURL, email, session); err != nil {
 				return fmt.Errorf("saving session: %w", err)
 			}
-			fmt.Println("Logged in.")
+			sayln(out, "Logged in.")
 			return nil
 		},
 	}

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"itsasecret.dev/cli/internal/api"
-	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/localcfg"
 
 	"github.com/spf13/cobra"
@@ -32,7 +31,7 @@ func newPullCmd() *cobra.Command {
 		Use:   "pull",
 		Short: "Pull env vars & secrets into a file or shell",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
@@ -45,7 +44,7 @@ func newPullCmd() *cobra.Command {
 				}
 				pc = localcfg.PullConfig{Mode: localcfg.PullModeFile, Out: path}
 			}
-			if err := runPull(cmd.Context(), apiURL, session, rs.project, rs.env, pc, cmd.OutOrStdout()); err != nil {
+			if err := runPull(cmd.Context(), client, rs.project, rs.env, pc, cmd.OutOrStdout()); err != nil {
 				return err
 			}
 			recordPull(cmd.ErrOrStderr(), rs, pc)
@@ -60,8 +59,7 @@ func newPullCmd() *cobra.Command {
 
 // runPull fetches the environment's values and delivers them per pc: export
 // lines on out for PullModeShell, written to pc.Out for PullModeFile.
-func runPull(ctx context.Context, apiURL string, session *auth.Session, project, env string, pc localcfg.PullConfig, out io.Writer) error {
-	client := api.NewClient(apiURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
+func runPull(ctx context.Context, client *api.Client, project, env string, pc localcfg.PullConfig, out io.Writer) error {
 	vars, err := client.Pull(ctx, project, env)
 	if err != nil {
 		return err

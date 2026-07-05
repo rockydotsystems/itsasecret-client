@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"time"
 
 	"itsasecret.dev/cli/internal/crypto"
 )
@@ -18,6 +19,7 @@ type Client struct {
 	baseURL    string
 	token      string
 	sessionKey []byte
+	onNewToken func(token string, expiresAt time.Time)
 	http       *http.Client
 }
 
@@ -35,6 +37,14 @@ func (c *Client) WithToken(token string) *Client {
 
 func (c *Client) WithSessionKey(key []byte) *Client {
 	c.sessionKey = key
+	return c
+}
+
+// WithTokenSaver registers a callback for rolled session tokens: CLI
+// sessions rotate on every successful request, and the new token must be
+// persisted or the next command is locked out once the grace window closes.
+func (c *Client) WithTokenSaver(fn func(token string, expiresAt time.Time)) *Client {
+	c.onNewToken = fn
 	return c
 }
 
@@ -71,12 +81,19 @@ type LoginRequest struct {
 	Email           string `json:"email"`
 	Password        string `json:"password"`
 	ClientPublicKey string `json:"clientPubkey"`
+	// Client identifies the session kind; "cli" sessions are short-lived and
+	// roll their token on every successful request.
+	Client string `json:"client,omitempty"`
 }
 
 type LoginResponse struct {
 	Token           string            `json:"token"`
 	ServerPublicKey string            `json:"serverPubkey"`
 	WrappedOrgKeys  map[string]string `json:"orgKeys"`
+	// MasterWrappedOrgKeys are wrapped under the master-password-derived key
+	// — the only form of org keys the CLI persists.
+	MasterWrappedOrgKeys map[string]string `json:"masterWrappedOrgKeys"`
+	SessionExpiresAt     time.Time         `json:"sessionExpiresAt"`
 }
 
 func (c *Client) Login(ctx context.Context, email, password, clientPubKey string) (*LoginResponse, error) {
@@ -84,6 +101,7 @@ func (c *Client) Login(ctx context.Context, email, password, clientPubKey string
 		Email:           email,
 		Password:        password,
 		ClientPublicKey: clientPubKey,
+		Client:          "cli",
 	}
 	resp, err := c.do(ctx, "POST", "/api/auth/login", body)
 	if err != nil {
@@ -390,5 +408,16 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (*http.R
 	if len(c.sessionKey) > 0 {
 		req.Header.Set("X-Session-Key", base64.StdEncoding.EncodeToString(c.sessionKey))
 	}
-	return c.http.Do(req)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	// Rolling sessions: successful responses carry a fresh token that must
+	// replace the one we sent.
+	if newToken := resp.Header.Get("X-New-Session-Token"); newToken != "" && c.onNewToken != nil {
+		expiresAt, _ := time.Parse(time.RFC3339, resp.Header.Get("X-Session-Expires-At"))
+		c.token = newToken
+		c.onNewToken(newToken, expiresAt)
+	}
+	return resp, nil
 }

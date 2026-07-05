@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"itsasecret.dev/cli/internal/api"
-	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 
@@ -56,16 +55,17 @@ resolves to.`,
 				if files.URL != "" {
 					apiURL = files.URL
 				}
-				session, err := auth.SessionFor(cfg, apiURL)
+				session, err := ensureSession(cmd.Context(), cmd, cfg, apiURL)
 				if err != nil {
-					// Not logged in to this server — show the current state.
-					if err := printLinkStatus(out, cwd); err != nil {
-						return err
+					// Can't authenticate here (e.g. no terminal) — show the
+					// current state instead.
+					if statusErr := printLinkStatus(out, cwd); statusErr != nil {
+						return statusErr
 					}
-					say(out, "Log in to %s (`shh login`) to link interactively.\n", apiURL)
+					sayln(out, err.Error())
 					return nil
 				}
-				client := api.NewClient(apiURL).WithToken(session.Token)
+				client := clientFor(cfg, apiURL, session)
 				return interactiveLink(cmd.Context(), client, cmd.InOrStdin(), out, cwd)
 			}
 

@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 
-	"itsasecret.dev/cli/internal/api"
 
 	"github.com/spf13/cobra"
 )
@@ -29,13 +28,11 @@ func newVarSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
 			project, env := rs.project, rs.env
-
-			client := api.NewClient(apiURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			if err := client.SetVar(cmd.Context(), project, env, key, value); err != nil {
 				return err
 			}
@@ -54,13 +51,11 @@ func newVarGetCmd() *cobra.Command {
 		Short: "Get a single env var value",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rs, apiURL, session, err := scope.resolveSession()
+			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
 			}
 			project, env := rs.project, rs.env
-
-			client := api.NewClient(apiURL).WithToken(session.Token).WithSessionKey(session.SessionKey)
 			val, err := client.GetVar(cmd.Context(), project, env, args[0])
 			if err != nil {
 				return err
