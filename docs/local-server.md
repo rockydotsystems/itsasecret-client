@@ -143,6 +143,7 @@ project ID on the dashboard or in the database; IDs are short opaque strings
 | ------------------------------------ | -------------------------------------------------- |
 | `shh link --project <id> [--env <e>]`| Pin the directory to a project/environment.        |
 | `shh pull`                           | Fetch vars + secrets into a file or shell.         |
+| `shh reload`                         | Pull again, delivered the way the last pull was.   |
 | `shh secret list`                    | List secret keys (values are never shown).         |
 | `shh secret get <key>`               | Print one decrypted secret value.                  |
 | `shh secret set <KEY=VALUE>`         | Set a secret (encrypted client-side before sync).  |
@@ -178,6 +179,18 @@ Load it into the current shell with `source .env`.
 
 ```sh
 eval "$(shh pull --project <project-id> --env production --shell)"
+```
+
+### Reloading
+
+`shh pull` records how it delivered values in `.shh.project` (`pull = shell`
+or `pull = file:<path>`, the path relative to the `.shh.project` directory).
+`shh reload` repeats that delivery — no flags needed, from anywhere in the
+tree:
+
+```sh
+shh reload                  # rewrites the same file the last pull wrote
+eval "$(shh reload)"        # when the last pull was --shell
 ```
 
 ### direnv (`.envrc`)

@@ -22,29 +22,51 @@ func addScopeFlags(cmd *cobra.Command, s *scopeFlags) {
 	cmd.Flags().StringVar(&s.env, "env", "", "environment name (overrides "+localcfg.EnvFile+"; default: production)")
 }
 
+// resolvedScope is the effective project/env plus the .shh.* files they were
+// resolved against, for commands that also read or record state there.
+type resolvedScope struct {
+	project string
+	env     string
+	// files is what localcfg.Find discovered; zero-valued when both values
+	// came from flags and the files were unreadable or absent.
+	files *localcfg.Scope
+}
+
+func (s *scopeFlags) resolveScope() (*resolvedScope, error) {
+	rs := &resolvedScope{project: s.project, env: s.env, files: &localcfg.Scope{}}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	found, err := localcfg.Find(cwd)
+	if err != nil {
+		// A broken marker file only matters if we need it: with both values
+		// given as flags the command can still run.
+		if s.project == "" || s.env == "" {
+			return nil, err
+		}
+	} else {
+		rs.files = found
+	}
+	if rs.project == "" {
+		rs.project = rs.files.Project
+	}
+	if rs.env == "" {
+		rs.env = rs.files.Env
+	}
+	if rs.project == "" {
+		return nil, fmt.Errorf("project not set: pass --project <id> or run `shh link --project <id>` to write %s", localcfg.ProjectFile)
+	}
+	if rs.env == "" {
+		rs.env = "production"
+	}
+	return rs, nil
+}
+
 func (s *scopeFlags) resolve() (project, env string, err error) {
-	project, env = s.project, s.env
-	if project == "" || env == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", "", err
-		}
-		found, err := localcfg.Find(cwd)
-		if err != nil {
-			return "", "", err
-		}
-		if project == "" {
-			project = found.Project
-		}
-		if env == "" {
-			env = found.Env
-		}
+	rs, err := s.resolveScope()
+	if err != nil {
+		return "", "", err
 	}
-	if project == "" {
-		return "", "", fmt.Errorf("project not set: pass --project <id> or run `shh link --project <id>` to write %s", localcfg.ProjectFile)
-	}
-	if env == "" {
-		env = "production"
-	}
-	return project, env, nil
+	return rs.project, rs.env, nil
 }

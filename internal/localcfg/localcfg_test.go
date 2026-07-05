@@ -112,6 +112,152 @@ func TestFindMultilineFileErrors(t *testing.T) {
 	}
 }
 
+func TestFindKeyValueProjectFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, ProjectFile), "# comment\nproject = heyq1dpc\npull = file:.env\n")
+
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.Project != "heyq1dpc" {
+		t.Errorf("project = %q, want heyq1dpc", scope.Project)
+	}
+	if scope.Pull == nil || scope.Pull.Mode != PullModeFile || scope.Pull.Out != ".env" {
+		t.Errorf("pull = %+v, want file:.env", scope.Pull)
+	}
+}
+
+func TestFindShellPullMode(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, ProjectFile), "project = heyq1dpc\npull = shell\n")
+
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.Pull == nil || scope.Pull.Mode != PullModeShell {
+		t.Errorf("pull = %+v, want shell", scope.Pull)
+	}
+}
+
+func TestFindInvalidPullValueErrors(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, ProjectFile), "project = heyq1dpc\npull = carrier-pigeon\n")
+
+	if _, err := Find(dir); err == nil {
+		t.Error("expected error for invalid pull value")
+	}
+}
+
+func TestFindIgnoresUnknownKeys(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, ProjectFile), "project = heyq1dpc\nfuture-key = whatever\n")
+
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.Project != "heyq1dpc" {
+		t.Errorf("project = %q, want unknown keys ignored", scope.Project)
+	}
+}
+
+func TestSavePullThenFind(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteProject(dir, "heyq1dpc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SavePull(path, PullConfig{Mode: PullModeFile, Out: "conf/.env"}); err != nil {
+		t.Fatal(err)
+	}
+
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.Project != "heyq1dpc" {
+		t.Errorf("project = %q, want preserved after SavePull", scope.Project)
+	}
+	if scope.Pull == nil || scope.Pull.Out != "conf/.env" {
+		t.Errorf("pull = %+v, want file:conf/.env", scope.Pull)
+	}
+}
+
+func TestSavePullUpgradesLegacyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ProjectFile)
+	writeFile(t, path, "heyq1dpc\n")
+
+	if err := SavePull(path, PullConfig{Mode: PullModeShell}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "project = heyq1dpc\npull = shell\n"
+	if string(data) != want {
+		t.Errorf("file = %q, want %q", data, want)
+	}
+}
+
+func TestSavePullIdenticalSkipsWrite(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteProject(dir, "heyq1dpc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pc := PullConfig{Mode: PullModeShell}
+	if err := SavePull(path, pc); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make a rewrite impossible; saving the identical config must not write.
+	if err := os.Chmod(path, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+	if err := SavePull(path, pc); err != nil {
+		t.Errorf("identical SavePull should skip the write, got %v", err)
+	}
+}
+
+func TestSavePullWithoutProjectErrors(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ProjectFile)
+	if err := SavePull(path, PullConfig{Mode: PullModeShell}); err == nil {
+		t.Error("expected error when .shh.project has no project")
+	}
+}
+
+func TestWriteProjectPreservesPull(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteProject(dir, "old-project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SavePull(path, PullConfig{Mode: PullModeShell}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Re-linking to a different project keeps the recorded pull mode.
+	if _, err := WriteProject(dir, "new-project"); err != nil {
+		t.Fatal(err)
+	}
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.Project != "new-project" {
+		t.Errorf("project = %q, want new-project", scope.Project)
+	}
+	if scope.Pull == nil || scope.Pull.Mode != PullModeShell {
+		t.Errorf("pull = %+v, want shell preserved across re-link", scope.Pull)
+	}
+}
+
 func TestWriteThenFindRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := WriteProject(dir, "heyq1dpc"); err != nil {

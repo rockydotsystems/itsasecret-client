@@ -65,6 +65,18 @@ func startFakeServer(t *testing.T) *httptest.Server {
 			{"id": "env3", "name": "dev-alice"},
 		})
 	})
+	mux.HandleFunc("GET /api/projects/{projectID}/envs/{envName}/pull", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		writeJSON(w, map[string]any{
+			"vars": []map[string]string{
+				{"key": "FOO", "value": "bar"},
+				{"key": "BAZ", "value": "qux"},
+			},
+			"secrets": map[string]string{},
+		})
+	})
 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -94,18 +106,23 @@ func setupConfig(t *testing.T, apiURL string, loggedIn bool) {
 	}
 }
 
-// runLink executes `link` with no flags, feeding input as stdin, and returns
+// runCmd executes a CLI command, feeding input as stdin, and returns
 // (combined output, error).
-func runLink(t *testing.T, input string) (string, error) {
+func runCmd(t *testing.T, input string, args ...string) (string, error) {
 	t.Helper()
 	root := NewRootCmd()
-	root.SetArgs([]string{"link"})
+	root.SetArgs(args)
 	root.SetIn(strings.NewReader(input))
 	var buf bytes.Buffer
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	err := root.Execute()
 	return buf.String(), err
+}
+
+func runLink(t *testing.T, input string) (string, error) {
+	t.Helper()
+	return runCmd(t, input, "link")
 }
 
 func readFileOrEmpty(t *testing.T, path string) string {
@@ -131,8 +148,8 @@ func TestLinkInteractiveFullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("link failed: %v\noutput:\n%s", err, out)
 	}
-	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "proj2\n" {
-		t.Errorf("%s = %q, want proj2", localcfg.ProjectFile, got)
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "project = proj2\n" {
+		t.Errorf("%s = %q, want proj2 recorded", localcfg.ProjectFile, got)
 	}
 	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.EnvFile)); got != "dev-alice\n" {
 		t.Errorf("%s = %q, want dev-alice", localcfg.EnvFile, got)
@@ -154,8 +171,8 @@ func TestLinkInteractiveSkipEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("link failed: %v\noutput:\n%s", err, out)
 	}
-	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "proj1\n" {
-		t.Errorf("%s = %q, want proj1", localcfg.ProjectFile, got)
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "project = proj1\n" {
+		t.Errorf("%s = %q, want proj1 recorded", localcfg.ProjectFile, got)
 	}
 	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.EnvFile)); got != "" {
 		t.Errorf("%s = %q, want it absent when the env is skipped", localcfg.EnvFile, got)
@@ -179,8 +196,8 @@ func TestLinkInteractiveReprompsOnInvalidInput(t *testing.T) {
 	if !strings.Contains(out, "must be a number between 1 and 2") {
 		t.Errorf("expected re-prompt message in output:\n%s", out)
 	}
-	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "proj1\n" {
-		t.Errorf("%s = %q, want proj1", localcfg.ProjectFile, got)
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "project = proj1\n" {
+		t.Errorf("%s = %q, want proj1 recorded", localcfg.ProjectFile, got)
 	}
 }
 

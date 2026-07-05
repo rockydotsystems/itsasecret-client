@@ -1,0 +1,139 @@
+package commands
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"itsasecret.dev/cli/internal/localcfg"
+)
+
+const sortedExports = "export BAZ='qux'\nexport FOO='bar'\n"
+
+func TestPullRecordsFileMode(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if _, err := localcfg.WriteProject(dir, "proj1"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "", "pull")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	if got := readFileOrEmpty(t, filepath.Join(dir, ".env")); got != sortedExports {
+		t.Errorf(".env = %q, want sorted exports", got)
+	}
+	want := "project = proj1\npull = file:.env\n"
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != want {
+		t.Errorf("%s = %q, want %q", localcfg.ProjectFile, got, want)
+	}
+}
+
+func TestPullRecordsShellMode(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if _, err := localcfg.WriteProject(dir, "proj1"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "", "pull", "--shell")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(out, "export FOO='bar'") {
+		t.Errorf("missing exports in output:\n%s", out)
+	}
+	want := "project = proj1\npull = shell\n"
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != want {
+		t.Errorf("%s = %q, want %q", localcfg.ProjectFile, got, want)
+	}
+}
+
+func TestPullWithoutMarkerRecordsNothing(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	out, err := runCmd(t, "", "pull", "--project", "proj1", "--shell")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "" {
+		t.Errorf("%s = %q, want no marker file created by pull", localcfg.ProjectFile, got)
+	}
+}
+
+func TestReloadFileModeFromSubdir(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	root := t.TempDir()
+	markerPath, err := localcfg.WriteProject(root, "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localcfg.SavePull(markerPath, localcfg.PullConfig{Mode: localcfg.PullModeFile, Out: ".env"}); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(root, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+
+	out, err := runCmd(t, "", "reload")
+	if err != nil {
+		t.Fatalf("reload failed: %v\noutput:\n%s", err, out)
+	}
+	// The recorded path is relative to .shh.project, so the file lands at the
+	// root even though reload ran in a subdirectory.
+	if got := readFileOrEmpty(t, filepath.Join(root, ".env")); got != sortedExports {
+		t.Errorf("root .env = %q, want sorted exports", got)
+	}
+	if got := readFileOrEmpty(t, filepath.Join(sub, ".env")); got != "" {
+		t.Errorf("subdir .env = %q, want it absent", got)
+	}
+}
+
+func TestReloadShellMode(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	markerPath, err := localcfg.WriteProject(dir, "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localcfg.SavePull(markerPath, localcfg.PullConfig{Mode: localcfg.PullModeShell}); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	out, err := runCmd(t, "", "reload")
+	if err != nil {
+		t.Fatalf("reload failed: %v\noutput:\n%s", err, out)
+	}
+	if out != sortedExports {
+		t.Errorf("output = %q, want sorted exports only", out)
+	}
+}
+
+func TestReloadWithoutRecordedModeErrors(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	if _, err := localcfg.WriteProject(dir, "proj1"); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	_, err := runCmd(t, "", "reload")
+	if err == nil || !strings.Contains(err.Error(), "no pull mode recorded") {
+		t.Errorf("err = %v, want a no-pull-recorded error", err)
+	}
+}

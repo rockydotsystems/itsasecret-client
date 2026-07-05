@@ -41,9 +41,15 @@ to the config file, so later commands need no flag.
   deliberately **no bulk `push`**. Read back with `shh secret get <key>` /
   `shh var get <key>`.
 - `shh pull --shell --project <project-id>` — populate env vars directly into shell (for `.envrc`/direnv).
+- `shh reload` — pull again, delivered the way the last `shh pull` here was.
+  `pull` records its delivery in `.shh.project` (`pull = shell` or
+  `pull = file:<path>`, path relative to the `.shh.project` dir), so reload
+  writes to the same place from anywhere in the tree; shell mode re-emits
+  exports for `eval "$(shh reload)"`.
 - `shh link --project <id> [--env <name>]` — pins a directory to a project/
-  environment by writing `.shh.project` (committed) and `.shh.env` (local,
-  auto-added to `.gitignore`). Commands resolve scope as flag > `.shh.*` file
+  environment by writing `.shh.project` (committed, `key = value` lines; a
+  legacy bare-ID file still parses) and `.shh.env` (local, auto-added to
+  `.gitignore`). Commands resolve scope as flag > `.shh.*` file
   (found by walking up from cwd, each file independently) > `production` for
   env. `shh link` with no flags links interactively when logged in (numbered
   org → project → env picker; env skippable); otherwise it prints the current
