@@ -65,11 +65,11 @@ func (s *scopeFlags) resolveScope() (*resolvedScope, error) {
 	return rs, nil
 }
 
-// apiURL returns the API base URL for this scope: an `api =` override in the
+// apiURL returns the API base URL for this scope: a `url =` override in the
 // resolved .shh.project wins over the machine-global config.
 func (rs *resolvedScope) apiURL(cfg *config.Config) string {
-	if rs.files.API != "" {
-		return rs.files.API
+	if rs.files.URL != "" {
+		return rs.files.URL
 	}
 	return cfg.APIURL
 }

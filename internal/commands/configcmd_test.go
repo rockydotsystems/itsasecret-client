@@ -31,7 +31,7 @@ func TestConfigSetGlobal(t *testing.T) {
 	setupConfig(t, "https://old.example.com", false)
 	t.Chdir(t.TempDir())
 
-	out, err := runCmd(t, "", "config", "set", "api", "http://localhost:3000/")
+	out, err := runCmd(t, "", "config", "set", "url", "http://localhost:3000/")
 	if err != nil {
 		t.Fatalf("config set failed: %v\noutput:\n%s", err, out)
 	}
@@ -52,11 +52,11 @@ func TestConfigSetProject(t *testing.T) {
 	}
 	t.Chdir(dir)
 
-	out, err := runCmd(t, "", "config", "set", "api", "https://secrets.example.com", "--project")
+	out, err := runCmd(t, "", "config", "set", "url", "https://secrets.example.com", "--project")
 	if err != nil {
 		t.Fatalf("config set failed: %v\noutput:\n%s", err, out)
 	}
-	want := "project = proj1\napi = https://secrets.example.com\n"
+	want := "project = proj1\nurl = https://secrets.example.com\n"
 	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != want {
 		t.Errorf("%s = %q, want %q", localcfg.ProjectFile, got, want)
 	}
@@ -69,7 +69,7 @@ func TestConfigSetProjectWithoutMarkerErrors(t *testing.T) {
 	setupConfig(t, "https://global.example.com", false)
 	t.Chdir(t.TempDir())
 
-	_, err := runCmd(t, "", "config", "set", "api", "https://x.example.com", "--project")
+	_, err := runCmd(t, "", "config", "set", "url", "https://x.example.com", "--project")
 	if err == nil || !strings.Contains(err.Error(), "shh link") {
 		t.Errorf("err = %v, want a no-marker error pointing at shh link", err)
 	}
@@ -80,8 +80,8 @@ func TestConfigSetInvalidURLErrors(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	for _, bad := range []string{"localhost:3000", "ftp://x", "not a url"} {
-		if _, err := runCmd(t, "", "config", "set", "api", bad); err == nil {
-			t.Errorf("config set api %q: expected an error", bad)
+		if _, err := runCmd(t, "", "config", "set", "url", bad); err == nil {
+			t.Errorf("config set url %q: expected an error", bad)
 		}
 	}
 }
@@ -93,12 +93,12 @@ func TestConfigGetShowsOverrideSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := localcfg.SaveAPI(markerPath, "https://secrets.example.com"); err != nil {
+	if err := localcfg.SaveURL(markerPath, "https://secrets.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(dir)
 
-	out, err := runCmd(t, "", "config", "get", "api")
+	out, err := runCmd(t, "", "config", "get", "url")
 	if err != nil {
 		t.Fatalf("config get failed: %v\noutput:\n%s", err, out)
 	}
@@ -134,7 +134,7 @@ func TestConfigMenuProjectScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config menu failed: %v\noutput:\n%s", err, out)
 	}
-	want := "project = proj1\napi = https://secrets.example.com\n"
+	want := "project = proj1\nurl = https://secrets.example.com\n"
 	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != want {
 		t.Errorf("%s = %q, want %q", localcfg.ProjectFile, got, want)
 	}
@@ -154,7 +154,7 @@ func TestPullUsesProjectAPIOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := localcfg.SaveAPI(markerPath, srv.URL); err != nil {
+	if err := localcfg.SaveURL(markerPath, srv.URL); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(dir)
@@ -190,7 +190,7 @@ func TestNotLoggedInToOverrideServerErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := localcfg.SaveAPI(markerPath, "https://secrets.example.com"); err != nil {
+	if err := localcfg.SaveURL(markerPath, "https://secrets.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(dir)

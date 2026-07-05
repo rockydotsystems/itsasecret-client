@@ -5,11 +5,12 @@
 // .shh.project is meant to be committed and holds `key = value` lines:
 //
 //	project = heyq1dpc
-//	api = https://secrets.example.com
+//	url = https://secrets.example.com
 //	pull = file:.env
 //
-// `project` is the project ID; `api` optionally pins the API server for this
-// repo (overriding the machine-global config, e.g. for self-hosted servers);
+// `project` is the project ID; `url` optionally pins the server for this
+// repo (overriding the machine-global config, e.g. for self-hosted servers;
+// `api` is accepted as a legacy alias when parsing);
 // `pull` records how the last `shh pull` delivered values ("shell", or
 // "file:<path>" with the path relative to the .shh.project directory unless
 // absolute) so `shh reload` can repeat it. A legacy file holding just a bare
@@ -59,13 +60,13 @@ func (p PullConfig) encode() string {
 // Scope is the project/environment resolved from .shh.* files. A zero field
 // means the corresponding file was not found (or was empty). The *Path fields
 // record which file each value came from, for user-facing messages. Pull and
-// API come from the same .shh.project the project came from; Pull is nil and
-// API empty when not recorded there.
+// URL come from the same .shh.project the project came from; Pull is nil and
+// URL empty when not recorded there.
 type Scope struct {
 	Project     string
 	ProjectPath string
 	Pull        *PullConfig
-	API         string
+	URL         string
 	Env         string
 	EnvPath     string
 }
@@ -89,7 +90,7 @@ func Find(dir string) (*Scope, error) {
 			}
 			if pc.Project != "" {
 				scope.Project, scope.ProjectPath = pc.Project, p
-				scope.Pull, scope.API = pc.Pull, pc.API
+				scope.Pull, scope.URL = pc.Pull, pc.URL
 			}
 		}
 		if scope.Env == "" {
@@ -116,14 +117,14 @@ func Find(dir string) (*Scope, error) {
 // projectConfig is the parsed content of a .shh.project file.
 type projectConfig struct {
 	Project string
-	API     string
+	URL     string
 	Pull    *PullConfig
 }
 
 func (c *projectConfig) format() string {
 	s := "project = " + c.Project + "\n"
-	if c.API != "" {
-		s += "api = " + c.API + "\n"
+	if c.URL != "" {
+		s += "url = " + c.URL + "\n"
 	}
 	if c.Pull != nil {
 		s += "pull = " + c.Pull.encode() + "\n"
@@ -159,8 +160,8 @@ func parseProjectFile(path string) (*projectConfig, error) {
 		switch key, value = strings.TrimSpace(key), strings.TrimSpace(value); key {
 		case "project":
 			pc.Project = value
-		case "api":
-			pc.API = value
+		case "url", "api": // "api" is a legacy alias for "url"
+			pc.URL = value
 		case "pull":
 			pc.Pull, err = parsePullValue(path, value)
 			if err != nil {
@@ -211,7 +212,7 @@ func readValue(path string) (string, error) {
 }
 
 // WriteProject writes .shh.project in dir and returns its path, preserving
-// the other recorded settings (api, pull) if the file already exists.
+// the other recorded settings (url, pull) if the file already exists.
 func WriteProject(dir, project string) (string, error) {
 	path := filepath.Join(dir, ProjectFile)
 	pc, err := parseProjectFile(path)
@@ -241,9 +242,9 @@ func SavePull(path string, pull PullConfig) error {
 	return saveProjectFile(path, pc)
 }
 
-// SaveAPI records (or, with an empty url, removes) the API server override
+// SaveURL records (or, with an empty value, removes) the server URL override
 // in an existing .shh.project file.
-func SaveAPI(path, url string) error {
+func SaveURL(path, url string) error {
 	pc, err := parseProjectFile(path)
 	if err != nil {
 		return err
@@ -251,7 +252,7 @@ func SaveAPI(path, url string) error {
 	if pc.Project == "" {
 		return fmt.Errorf("%s: no project recorded", path)
 	}
-	pc.API = url
+	pc.URL = url
 	return saveProjectFile(path, pc)
 }
 

@@ -20,9 +20,9 @@ func newConfigCmd() *cobra.Command {
 		Short: "View or change CLI configuration",
 		Long: `View or change CLI configuration. Run bare for an interactive menu.
 
-The only setting today is the API server. It is set once per machine
-(stored in the global config file); a repo can override it by committing an
-` + "`api =`" + ` line in ` + localcfg.ProjectFile + ` — useful for self-hosted servers.
+The only setting today is the server URL. It is set once per machine
+(stored in the global config file); a repo can override it by committing a
+` + "`url =`" + ` line in ` + localcfg.ProjectFile + ` — useful for self-hosted servers.
 Every command resolves it as: ` + localcfg.ProjectFile + ` > global > default.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -36,18 +36,18 @@ Every command resolves it as: ` + localcfg.ProjectFile + ` > global > default.`,
 
 func newConfigGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get api",
-		Short: "Print the API server the CLI would use here",
+		Use:       "get url",
+		Short:     "Print the server URL the CLI would use here",
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
-		ValidArgs: []string{"api"},
+		ValidArgs: []string{"url"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 			cfg, files, err := loadConfigAndFiles()
 			if err != nil {
 				return err
 			}
-			if files.API != "" {
-				say(out, "%s (from %s)\n", files.API, files.ProjectPath)
+			if files.URL != "" {
+				say(out, "%s (from %s)\n", files.URL, files.ProjectPath)
 			} else {
 				say(out, "%s (this machine's global config)\n", cfg.APIURL)
 			}
@@ -59,14 +59,14 @@ func newConfigGetCmd() *cobra.Command {
 func newConfigSetCmd() *cobra.Command {
 	var inProject bool
 	cmd := &cobra.Command{
-		Use:   "set api <url>",
-		Short: "Set the API server once — globally, or in " + localcfg.ProjectFile,
+		Use:   "set url <url>",
+		Short: "Set the server URL once — globally, or in " + localcfg.ProjectFile,
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if args[0] != "api" {
-				return fmt.Errorf("unknown setting %q (only \"api\" exists)", args[0])
+			if args[0] != "url" {
+				return fmt.Errorf("unknown setting %q (only \"url\" exists)", args[0])
 			}
-			apiURL, err := normalizeAPIURL(args[1])
+			serverURL, err := normalizeServerURL(args[1])
 			if err != nil {
 				return err
 			}
@@ -76,9 +76,9 @@ func newConfigSetCmd() *cobra.Command {
 				return err
 			}
 			if inProject {
-				return setProjectAPI(out, files, apiURL)
+				return setProjectURL(out, files, serverURL)
 			}
-			return setGlobalAPI(out, cfg, apiURL)
+			return setGlobalURL(out, cfg, serverURL)
 		},
 	}
 	cmd.Flags().BoolVar(&inProject, "project", false, "save in the resolved "+localcfg.ProjectFile+" instead of the global config")
@@ -101,28 +101,28 @@ func loadConfigAndFiles() (*config.Config, *localcfg.Scope, error) {
 	return cfg, files, nil
 }
 
-func setGlobalAPI(out io.Writer, cfg *config.Config, apiURL string) error {
-	cfg.APIURL = apiURL
+func setGlobalURL(out io.Writer, cfg *config.Config, serverURL string) error {
+	cfg.APIURL = serverURL
 	if err := cfg.Save(); err != nil {
 		return err
 	}
-	say(out, "API server set to %s for this machine.\n", apiURL)
-	sayln(out, "Run `shh login` to authenticate against it.")
+	say(out, "Server URL set to %s for this machine.\n", serverURL)
+	sayln(out, "Run `shh login` if you haven't authenticated against it yet.")
 	return nil
 }
 
-func setProjectAPI(out io.Writer, files *localcfg.Scope, apiURL string) error {
+func setProjectURL(out io.Writer, files *localcfg.Scope, serverURL string) error {
 	if files.ProjectPath == "" {
 		return fmt.Errorf("no %s found here — run `shh link` first, or set it globally without --project", localcfg.ProjectFile)
 	}
-	if err := localcfg.SaveAPI(files.ProjectPath, apiURL); err != nil {
+	if err := localcfg.SaveURL(files.ProjectPath, serverURL); err != nil {
 		return err
 	}
-	say(out, "API server set to %s in %s (commit this file).\n", apiURL, files.ProjectPath)
+	say(out, "Server URL set to %s in %s (commit this file).\n", serverURL, files.ProjectPath)
 	return nil
 }
 
-// runConfigMenu interactively sets the API server: pick the scope (machine
+// runConfigMenu interactively sets the server URL: pick the scope (machine
 // vs project), then enter the URL.
 func runConfigMenu(cmd *cobra.Command) error {
 	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
@@ -132,9 +132,9 @@ func runConfigMenu(cmd *cobra.Command) error {
 	}
 
 	sayln(out, "itsasecret CLI configuration")
-	say(out, "api server: %s (global)\n", cfg.APIURL)
-	if files.API != "" {
-		say(out, "            %s (override from %s)\n", files.API, files.ProjectPath)
+	say(out, "server url: %s (global)\n", cfg.APIURL)
+	if files.URL != "" {
+		say(out, "            %s (override from %s)\n", files.URL, files.ProjectPath)
 	}
 	sayln(out)
 
@@ -148,37 +148,37 @@ func runConfigMenu(cmd *cobra.Command) error {
 			huh.NewOption("this machine (global config)", scopeGlobal),
 			huh.NewOption(fmt.Sprintf("this project (%s, committed)", files.ProjectPath), scopeProject),
 		}
-		scope, err = selectIndex(cmd.Context(), in, out, "Where should the API server be set?", opts)
+		scope, err = selectIndex(cmd.Context(), in, out, "Where should the server URL be set?", opts)
 		if err != nil {
 			return err
 		}
 	}
 
 	current := cfg.APIURL
-	if scope == scopeProject && files.API != "" {
-		current = files.API
+	if scope == scopeProject && files.URL != "" {
+		current = files.URL
 	}
-	apiURL := current
+	serverURL := current
 	field := huh.NewInput().
-		Title("API server URL").
+		Title("Server URL").
 		Description("Set once — every command uses it from now on.").
-		Value(&apiURL).
-		Validate(validateAPIURL)
+		Value(&serverURL).
+		Validate(validateServerURL)
 	if err := runField(cmd.Context(), in, out, field); err != nil {
 		return err
 	}
-	apiURL, err = normalizeAPIURL(apiURL)
+	serverURL, err = normalizeServerURL(serverURL)
 	if err != nil {
 		return err
 	}
 
 	if scope == scopeProject {
-		return setProjectAPI(out, files, apiURL)
+		return setProjectURL(out, files, serverURL)
 	}
-	return setGlobalAPI(out, cfg, apiURL)
+	return setGlobalURL(out, cfg, serverURL)
 }
 
-func validateAPIURL(s string) error {
+func validateServerURL(s string) error {
 	u, err := url.Parse(strings.TrimSpace(s))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("enter a full URL like https://itsasecret.dev")
@@ -186,10 +186,10 @@ func validateAPIURL(s string) error {
 	return nil
 }
 
-// normalizeAPIURL validates and canonicalizes the URL (no trailing slash —
+// normalizeServerURL validates and canonicalizes the URL (no trailing slash —
 // the API client appends absolute paths).
-func normalizeAPIURL(s string) (string, error) {
-	if err := validateAPIURL(s); err != nil {
+func normalizeServerURL(s string) (string, error) {
+	if err := validateServerURL(s); err != nil {
 		return "", err
 	}
 	return strings.TrimRight(strings.TrimSpace(s), "/"), nil

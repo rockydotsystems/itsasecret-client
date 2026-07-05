@@ -53,8 +53,8 @@ resolves to.`,
 					return err
 				}
 				apiURL := cfg.APIURL
-				if files.API != "" {
-					apiURL = files.API
+				if files.URL != "" {
+					apiURL = files.URL
 				}
 				session, err := auth.SessionFor(cfg, apiURL)
 				if err != nil {

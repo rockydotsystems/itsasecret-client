@@ -82,7 +82,7 @@ func TestAPIURLProjectOverrideWins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := localcfg.SaveAPI(markerPath, "https://secrets.example.com"); err != nil {
+	if err := localcfg.SaveURL(markerPath, "https://secrets.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(dir)

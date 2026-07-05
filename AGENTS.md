@@ -30,8 +30,8 @@ go mod tidy                    # tidy deps (inside dev shell)
 
 To point the CLI at a locally running `www` server instead of production, see
 [`docs/local-server.md`](docs/local-server.md). In short: start the `www` dev
-server, then `itsasecret login --api http://localhost:3000` — the URL persists
-to the config file, so later commands need no flag.
+server, then `shh config set url http://localhost:3000` and `shh login` — the
+URL persists to the config file, so later commands need no flag.
 
 ## CLI behavior (from docs/product-spec.md)
 
@@ -50,10 +50,10 @@ to the config file, so later commands need no flag.
   `shh link`, defaulting to production), and only pulls of that linked scope
   update the record — one-off `--project`/`--env` overrides don't.
 - `shh config` — view/set the API server. Set once per machine (global
-  `config.json`), or per repo via an `api =` line in `.shh.project`
+  `config.json`), or per repo via a `url =` line in `.shh.project`
   (committed; for self-hosted servers). Bare `shh config` is an interactive
-  menu (scope picker + URL input); `shh config set api <url> [--project]` and
-  `shh config get api` are the direct forms. Resolution: `.shh.project` >
+  menu (scope picker + URL input); `shh config set url <url> [--project]` and
+  `shh config get url` are the direct forms. Resolution: `.shh.project` >
   global > default. `shh login` has **no `--api` flag** — it uses the same
   resolution. Sessions are stored **per server** (`sessions` map in
   config.json, keyed by canonical API URL; legacy flat fields migrate on
@@ -61,7 +61,7 @@ to the config file, so later commands need no flag.
   every command picks the session matching its resolved URL.
 - `shh link --project <id> [--env <name>]` — pins a directory to a project/
   environment by writing `.shh.project` (committed, `key = value` lines —
-  `project`, optional `api`, optional `pull`; a legacy bare-ID file still
+  `project`, optional `url` (legacy `api` alias parses), optional `pull`; a legacy bare-ID file still
   parses) and `.shh.env` (local, auto-added to `.gitignore`). Commands resolve scope as flag > `.shh.*` file
   (found by walking up from cwd, each file independently) > `production` for
   env. `shh link` with no flags links interactively when logged in (numbered

@@ -63,8 +63,8 @@ The target server is set once per machine with `shh config` — run it bare for
 an interactive menu, or set it directly:
 
 ```sh
-shh config set api http://localhost:3000
-# API server set to http://localhost:3000 for this machine.
+shh config set url http://localhost:3000
+# Server URL set to http://localhost:3000 for this machine.
 # Run `shh login` to authenticate against it.
 shh login
 # Email:    you@example.com
@@ -79,10 +79,10 @@ shh pull   --project <project-id> --env production --shell
 shh secret list --project <project-id>
 ```
 
-A repo can also pin its server by committing an `api =` line in
-`.shh.project` — `shh config set api <url> --project` writes it (or pick
+A repo can also pin its server by committing a `url =` line in
+`.shh.project` — `shh config set url <url> --project` writes it (or pick
 "this project" in the bare `shh config` menu). The project override beats the
-global config, and `shh config get api` shows which one is in effect.
+global config, and `shh config get url` shows which one is in effect.
 
 ### Configuration file
 
@@ -92,7 +92,7 @@ directory (`$XDG_CONFIG_HOME/itsasecret/`, defaulting to
 
 | Field      | Purpose                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------ |
-| `apiUrl`   | Server the CLI targets by default (set by `shh config set api`).                                  |
+| `apiUrl`   | Server the CLI targets by default (set by `shh config set url`).                                  |
 | `sessions` | Per-server sessions keyed by API URL — token, ECDH transport key, unwrapped org keys. Logging in to local doesn't disturb your production session (or vice versa). |
 
 The file is written with `0600` permissions. To use a throwaway config without
@@ -100,7 +100,7 @@ touching your real one, override the config directory for the session:
 
 ```sh
 export XDG_CONFIG_HOME=/tmp/itsasecret-dev
-shh config set api http://localhost:3000
+shh config set url http://localhost:3000
 shh login
 ```
 
@@ -147,7 +147,7 @@ project ID on the dashboard or in the database; IDs are short opaque strings
 
 | Command                              | Effect                                             |
 | ------------------------------------ | -------------------------------------------------- |
-| `shh config [set api <url>]`         | View/set the API server (menu when bare).          |
+| `shh config [set url <url>]`         | View/set the server URL (menu when bare).          |
 | `shh link --project <id> [--env <e>]`| Pin the directory to a project/environment.        |
 | `shh pull`                           | Fetch vars + secrets into a file or shell.         |
 | `shh reload`                         | Pull again, delivered the way the last pull was.   |
@@ -227,7 +227,7 @@ direnv allow
 Point the config back at production:
 
 ```sh
-shh config set api https://itsasecret.dev
+shh config set url https://itsasecret.dev
 ```
 
 Sessions are stored per server, so if you were logged in to production before,
@@ -245,7 +245,7 @@ rm ~/.config/itsasecret/config.json
 | ----------------------------------------- | --------------------------------------------------------------------- |
 | `login failed: ... HTTP 401`              | Wrong credentials, or the account does not exist in the local DB.     |
 | `HTTP 403` (`Email not verified`)         | Verify the account first (link is printed to the server terminal).    |
-| `not logged in to <url> — run shh login`  | No session for that server; run `shh login` (after `shh config set api` for local). |
+| `not logged in to <url> — run shh login`  | No session for that server; run `shh login` (after `shh config set url` for local). |
 | `environment "<name>" not found`          | The env name does not exist in that project; check `--env`.           |
 | `get secret: HTTP 404`                    | The key does not exist in that environment.                           |
 | Connection refused                        | The `www` dev server is not running on `http://localhost:3000`.       |

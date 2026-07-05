@@ -18,7 +18,7 @@ func newLoginCmd() *cobra.Command {
 		Short: "Authenticate and store a session token locally",
 		Long: `Authenticate and store a session token locally.
 
-The server to log in to comes from an ` + "`api =`" + ` line in ` + localcfg.ProjectFile + `
+The server to log in to comes from an ` + "`url =`" + ` line in ` + localcfg.ProjectFile + `
 (if the current directory tree has one) or the machine-global config —
 change either with ` + "`shh config`" + `.`,
 		Args: cobra.NoArgs,
@@ -36,8 +36,8 @@ change either with ` + "`shh config`" + `.`,
 				return err
 			}
 			apiURL := cfg.APIURL
-			if files.API != "" {
-				apiURL = files.API
+			if files.URL != "" {
+				apiURL = files.URL
 				fmt.Printf("Logging in to %s (from %s)\n", apiURL, files.ProjectPath)
 			} else {
 				fmt.Printf("Logging in to %s\n", apiURL)

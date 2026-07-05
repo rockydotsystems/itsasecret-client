@@ -224,13 +224,13 @@ func TestSavePullIdenticalSkipsWrite(t *testing.T) {
 	}
 }
 
-func TestAPIKeyRoundTrip(t *testing.T) {
+func TestURLKeyRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path, err := WriteProject(dir, "heyq1dpc")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveAPI(path, "https://secrets.example.com"); err != nil {
+	if err := SaveURL(path, "https://secrets.example.com"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -238,12 +238,25 @@ func TestAPIKeyRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if scope.API != "https://secrets.example.com" {
-		t.Errorf("api = %q, want the saved override", scope.API)
+	if scope.URL != "https://secrets.example.com" {
+		t.Errorf("url = %q, want the saved override", scope.URL)
 	}
 }
 
-func TestSaveAPIPreservesPullAndProject(t *testing.T) {
+func TestLegacyAPIKeyStillParses(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, ProjectFile), "project = heyq1dpc\napi = https://legacy.example.com\n")
+
+	scope, err := Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope.URL != "https://legacy.example.com" {
+		t.Errorf("url = %q, want the legacy api key honored", scope.URL)
+	}
+}
+
+func TestSaveURLPreservesPullAndProject(t *testing.T) {
 	dir := t.TempDir()
 	path, err := WriteProject(dir, "heyq1dpc")
 	if err != nil {
@@ -252,19 +265,19 @@ func TestSaveAPIPreservesPullAndProject(t *testing.T) {
 	if err := SavePull(path, PullConfig{Mode: PullModeShell}); err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveAPI(path, "https://secrets.example.com"); err != nil {
+	if err := SaveURL(path, "https://secrets.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "project = heyq1dpc\napi = https://secrets.example.com\npull = shell\n"
+	want := "project = heyq1dpc\nurl = https://secrets.example.com\npull = shell\n"
 	if string(data) != want {
 		t.Errorf("file = %q, want %q", data, want)
 	}
 
-	// And the reverse: re-linking and re-recording a pull keep the api line.
+	// And the reverse: re-linking and re-recording a pull keep the url line.
 	if _, err := WriteProject(dir, "newproj"); err != nil {
 		t.Fatal(err)
 	}
@@ -275,21 +288,21 @@ func TestSaveAPIPreservesPullAndProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if scope.API != "https://secrets.example.com" {
-		t.Errorf("api = %q, want it preserved across WriteProject/SavePull", scope.API)
+	if scope.URL != "https://secrets.example.com" {
+		t.Errorf("url = %q, want it preserved across WriteProject/SavePull", scope.URL)
 	}
 }
 
-func TestSaveAPIEmptyRemovesKey(t *testing.T) {
+func TestSaveURLEmptyRemovesKey(t *testing.T) {
 	dir := t.TempDir()
 	path, err := WriteProject(dir, "heyq1dpc")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveAPI(path, "https://secrets.example.com"); err != nil {
+	if err := SaveURL(path, "https://secrets.example.com"); err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveAPI(path, ""); err != nil {
+	if err := SaveURL(path, ""); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
@@ -297,7 +310,7 @@ func TestSaveAPIEmptyRemovesKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(data) != "project = heyq1dpc\n" {
-		t.Errorf("file = %q, want the api line removed", data)
+		t.Errorf("file = %q, want the url line removed", data)
 	}
 }
 
