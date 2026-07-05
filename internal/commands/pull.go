@@ -106,10 +106,20 @@ func writeExports(w io.Writer, vars map[string]string) error {
 }
 
 // recordPull remembers the delivery mode in the resolved .shh.project so
-// `shh reload` can repeat it. Best-effort: a pull that worked shouldn't fail
-// because the marker file can't be written.
+// `shh reload` can repeat it. Only a pull of the linked scope is recorded —
+// a one-off --project/--env override describes a different pull than the one
+// `shh reload` (which always targets the linked project and env) would
+// repeat. Best-effort: a pull that worked shouldn't fail because the marker
+// file can't be written.
 func recordPull(errOut io.Writer, rs *resolvedScope, pc localcfg.PullConfig) {
-	if rs.files.ProjectPath == "" {
+	if rs.files.ProjectPath == "" || rs.project != rs.files.Project {
+		return
+	}
+	linkedEnv := rs.files.Env
+	if linkedEnv == "" {
+		linkedEnv = "production"
+	}
+	if rs.env != linkedEnv {
 		return
 	}
 	if pc.Mode == localcfg.PullModeFile {

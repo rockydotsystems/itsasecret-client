@@ -45,7 +45,10 @@ to the config file, so later commands need no flag.
   `pull` records its delivery in `.shh.project` (`pull = shell` or
   `pull = file:<path>`, path relative to the `.shh.project` dir), so reload
   writes to the same place from anywhere in the tree; shell mode re-emits
-  exports for `eval "$(shh reload)"`.
+  exports for `eval "$(shh reload)"`. Reload always targets the linked scope
+  (project from `.shh.project`, env from `.shh.env` as set by the last
+  `shh link`, defaulting to production), and only pulls of that linked scope
+  update the record — one-off `--project`/`--env` overrides don't.
 - `shh link --project <id> [--env <name>]` — pins a directory to a project/
   environment by writing `.shh.project` (committed, `key = value` lines; a
   legacy bare-ID file still parses) and `.shh.env` (local, auto-added to

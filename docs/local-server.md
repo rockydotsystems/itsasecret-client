@@ -193,6 +193,11 @@ shh reload                  # rewrites the same file the last pull wrote
 eval "$(shh reload)"        # when the last pull was --shell
 ```
 
+Reload always pulls the linked scope: the project from `.shh.project` and the
+environment `shh link` wrote to `.shh.env` (production if none). Pulls that
+override `--project`/`--env` one-off don't update the recorded delivery, so a
+bare reload keeps reproducing the linked scope's last pull.
+
 ### direnv (`.envrc`)
 
 Add the pull to `.envrc` so values load automatically on `cd`. direnv runs the

@@ -55,6 +55,78 @@ func TestPullRecordsShellMode(t *testing.T) {
 	}
 }
 
+func TestPullWithEnvOverrideDoesNotRecord(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	markerPath, err := localcfg.WriteProject(dir, "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := localcfg.WriteEnv(dir, "staging"); err != nil {
+		t.Fatal(err)
+	}
+	if err := localcfg.SavePull(markerPath, localcfg.PullConfig{Mode: localcfg.PullModeFile, Out: ".env"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// A one-off pull of another env must not change what reload repeats.
+	out, err := runCmd(t, "", "pull", "--shell", "--env", "dev-alice")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	want := "project = proj1\npull = file:.env\n"
+	if got := readFileOrEmpty(t, markerPath); got != want {
+		t.Errorf("%s = %q, want the recorded mode untouched (%q)", localcfg.ProjectFile, got, want)
+	}
+}
+
+func TestPullWithProjectOverrideDoesNotRecord(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	markerPath, err := localcfg.WriteProject(dir, "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "", "pull", "--shell", "--project", "proj2")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	want := "project = proj1\n"
+	if got := readFileOrEmpty(t, markerPath); got != want {
+		t.Errorf("%s = %q, want no pull recorded for a foreign project", localcfg.ProjectFile, got)
+	}
+}
+
+func TestPullMatchingLinkedEnvRecords(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	markerPath, err := localcfg.WriteProject(dir, "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := localcfg.WriteEnv(dir, "staging"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Explicit flags that spell out the linked scope still count as a pull
+	// of the linked scope.
+	out, err := runCmd(t, "", "pull", "--shell", "--env", "staging")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	want := "project = proj1\npull = shell\n"
+	if got := readFileOrEmpty(t, markerPath); got != want {
+		t.Errorf("%s = %q, want %q", localcfg.ProjectFile, got, want)
+	}
+}
+
 func TestPullWithoutMarkerRecordsNothing(t *testing.T) {
 	srv := startFakeServer(t)
 	setupConfig(t, srv.URL, true)
