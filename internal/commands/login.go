@@ -54,7 +54,8 @@ change either with ` + "`shh config`" + `.`,
 			if err != nil {
 				return fmt.Errorf("login failed: %w", err)
 			}
-			if err := auth.SaveSession(cfg, session); err != nil {
+			// Sessions are per-server; other servers' logins are untouched.
+			if err := auth.SaveSession(cfg, apiURL, session); err != nil {
 				return fmt.Errorf("saving session: %w", err)
 			}
 			fmt.Println("Logged in.")

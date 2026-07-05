@@ -55,7 +55,10 @@ to the config file, so later commands need no flag.
   menu (scope picker + URL input); `shh config set api <url> [--project]` and
   `shh config get api` are the direct forms. Resolution: `.shh.project` >
   global > default. `shh login` has **no `--api` flag** — it uses the same
-  resolution.
+  resolution. Sessions are stored **per server** (`sessions` map in
+  config.json, keyed by canonical API URL; legacy flat fields migrate on
+  load), so logins against production, self-hosted, and local dev coexist and
+  every command picks the session matching its resolved URL.
 - `shh link --project <id> [--env <name>]` — pins a directory to a project/
   environment by writing `.shh.project` (committed, `key = value` lines —
   `project`, optional `api`, optional `pull`; a legacy bare-ID file still

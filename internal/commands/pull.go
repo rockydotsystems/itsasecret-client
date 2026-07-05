@@ -32,11 +32,7 @@ func newPullCmd() *cobra.Command {
 		Use:   "pull",
 		Short: "Pull env vars & secrets into a file or shell",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, session, err := auth.LoadSessionConfig()
-			if err != nil {
-				return err
-			}
-			rs, err := scope.resolveScope()
+			rs, apiURL, session, err := scope.resolveSession()
 			if err != nil {
 				return err
 			}
@@ -49,7 +45,7 @@ func newPullCmd() *cobra.Command {
 				}
 				pc = localcfg.PullConfig{Mode: localcfg.PullModeFile, Out: path}
 			}
-			if err := runPull(cmd.Context(), rs.apiURL(cfg), session, rs.project, rs.env, pc, cmd.OutOrStdout()); err != nil {
+			if err := runPull(cmd.Context(), apiURL, session, rs.project, rs.env, pc, cmd.OutOrStdout()); err != nil {
 				return err
 			}
 			recordPull(cmd.ErrOrStderr(), rs, pc)

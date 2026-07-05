@@ -9,6 +9,7 @@ import (
 
 	"itsasecret.dev/cli/internal/api"
 	"itsasecret.dev/cli/internal/auth"
+	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 
 	"github.com/charmbracelet/huh"
@@ -47,18 +48,22 @@ resolves to.`,
 				if err != nil {
 					return err
 				}
-				cfg, session, err := auth.LoadSessionConfig()
+				cfg, err := config.Load()
 				if err != nil {
-					// Not logged in — show the current state instead.
-					if err := printLinkStatus(out, cwd); err != nil {
-						return err
-					}
-					sayln(out, "Run `shh login` to link interactively.")
-					return nil
+					return err
 				}
 				apiURL := cfg.APIURL
 				if files.API != "" {
 					apiURL = files.API
+				}
+				session, err := auth.SessionFor(cfg, apiURL)
+				if err != nil {
+					// Not logged in to this server — show the current state.
+					if err := printLinkStatus(out, cwd); err != nil {
+						return err
+					}
+					say(out, "Log in to %s (`shh login`) to link interactively.\n", apiURL)
+					return nil
 				}
 				client := api.NewClient(apiURL).WithToken(session.Token)
 				return interactiveLink(cmd.Context(), client, cmd.InOrStdin(), out, cwd)

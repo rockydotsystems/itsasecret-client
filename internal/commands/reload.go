@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/localcfg"
 
 	"github.com/spf13/cobra"
@@ -24,11 +23,7 @@ to the same place from anywhere in the tree. For a shell-mode reload, load
 the output with: eval "$(shh reload)"`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, session, err := auth.LoadSessionConfig()
-			if err != nil {
-				return err
-			}
-			rs, err := scope.resolveScope()
+			rs, apiURL, session, err := scope.resolveSession()
 			if err != nil {
 				return err
 			}
@@ -40,7 +35,7 @@ the output with: eval "$(shh reload)"`,
 			if delivery.Mode == localcfg.PullModeFile && !filepath.IsAbs(delivery.Out) {
 				delivery.Out = filepath.Join(filepath.Dir(rs.files.ProjectPath), delivery.Out)
 			}
-			return runPull(cmd.Context(), rs.apiURL(cfg), session, rs.project, rs.env, delivery, cmd.OutOrStdout())
+			return runPull(cmd.Context(), apiURL, session, rs.project, rs.env, delivery, cmd.OutOrStdout())
 		},
 	}
 	addScopeFlags(cmd, &scope)

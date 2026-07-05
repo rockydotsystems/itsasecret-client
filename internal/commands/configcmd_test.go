@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 )
 
@@ -145,8 +146,9 @@ func TestConfigMenuProjectScope(t *testing.T) {
 func TestPullUsesProjectAPIOverride(t *testing.T) {
 	srv := startFakeServer(t)
 	// Global config points at a dead port; only the .shh.project override
-	// can make the pull succeed.
+	// (and its per-server session) can make the pull succeed.
 	setupConfig(t, "http://127.0.0.1:1", true)
+	addSession(t, srv.URL)
 	dir := t.TempDir()
 	markerPath, err := localcfg.WriteProject(dir, "proj1")
 	if err != nil {
@@ -163,5 +165,38 @@ func TestPullUsesProjectAPIOverride(t *testing.T) {
 	}
 	if !strings.Contains(out, "export FOO='bar'") {
 		t.Errorf("missing exports in output:\n%s", out)
+	}
+}
+
+// addSession stores a test session for one more server, alongside whatever
+// setupConfig wrote.
+func addSession(t *testing.T, apiURL string) {
+	t.Helper()
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.SetSession(apiURL, config.StoredSession{Token: "test-token"})
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNotLoggedInToOverrideServerErrors(t *testing.T) {
+	// Logged in globally, but the repo points at a server with no session.
+	setupConfig(t, "https://global.example.com", true)
+	dir := t.TempDir()
+	markerPath, err := localcfg.WriteProject(dir, "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localcfg.SaveAPI(markerPath, "https://secrets.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	_, err = runCmd(t, "", "secret", "list")
+	if err == nil || !strings.Contains(err.Error(), "not logged in to https://secrets.example.com") {
+		t.Errorf("err = %v, want a per-server not-logged-in error", err)
 	}
 }

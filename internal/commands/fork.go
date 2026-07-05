@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"itsasecret.dev/cli/internal/api"
-	"itsasecret.dev/cli/internal/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -18,11 +17,7 @@ func newForkCmd() *cobra.Command {
 		Use:   "fork",
 		Short: "Fork an environment (e.g. production → staging)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, session, err := auth.LoadSessionConfig()
-			if err != nil {
-				return err
-			}
-			rs, err := scope.resolveScope()
+			rs, apiURL, session, err := scope.resolveSession()
 			if err != nil {
 				return err
 			}
@@ -31,7 +26,7 @@ func newForkCmd() *cobra.Command {
 				return fmt.Errorf("--name is required (new environment name)")
 			}
 
-			client := api.NewClient(rs.apiURL(cfg)).WithToken(session.Token)
+			client := api.NewClient(apiURL).WithToken(session.Token)
 			if err := client.ForkEnv(cmd.Context(), project, env, name); err != nil {
 				return err
 			}

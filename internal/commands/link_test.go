@@ -84,7 +84,7 @@ func startFakeServer(t *testing.T) *httptest.Server {
 }
 
 // setupConfig points the CLI config (via XDG_CONFIG_HOME) at apiURL, with a
-// session token when loggedIn.
+// stored session for that server when loggedIn.
 func setupConfig(t *testing.T, apiURL string, loggedIn bool) {
 	t.Helper()
 	cfgHome := t.TempDir()
@@ -93,9 +93,11 @@ func setupConfig(t *testing.T, apiURL string, loggedIn bool) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	cfg := map[string]string{"apiUrl": apiURL}
+	cfg := map[string]any{"apiUrl": apiURL}
 	if loggedIn {
-		cfg["sessionToken"] = "test-token"
+		cfg["sessions"] = map[string]any{
+			apiURL: map[string]string{"token": "test-token"},
+		}
 	}
 	data, err := json.Marshal(cfg)
 	if err != nil {

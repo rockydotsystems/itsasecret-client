@@ -2,43 +2,45 @@ package auth
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
 
 	"itsasecret.dev/cli/internal/config"
 )
 
-func SaveSession(cfg *config.Config, session *Session) error {
-	cfg.SessionToken = session.Token
-	cfg.SessionKey = base64.RawURLEncoding.EncodeToString(session.SessionKey)
+// SaveSession stores the session for the server it was created against.
+// Sessions are per-server, so logging in to one server doesn't disturb
+// sessions on others.
+func SaveSession(cfg *config.Config, apiURL string, session *Session) error {
 	orgKeys := make(map[string]string, len(session.OrgKeys))
 	for orgID, key := range session.OrgKeys {
 		orgKeys[orgID] = base64.RawURLEncoding.EncodeToString(key)
 	}
-	cfg.OrgKeys = orgKeys
+	cfg.SetSession(apiURL, config.StoredSession{
+		Token:      session.Token,
+		SessionKey: base64.RawURLEncoding.EncodeToString(session.SessionKey),
+		OrgKeys:    orgKeys,
+	})
 	return cfg.Save()
 }
 
-func LoadSession() (*Session, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, err
-	}
-	if cfg.SessionToken == "" {
-		return nil, errors.New("not logged in — run `itsasecret login` first")
+// SessionFor returns the session for an API URL, decoded and ready to use.
+func SessionFor(cfg *config.Config, apiURL string) (*Session, error) {
+	stored, ok := cfg.Session(apiURL)
+	if !ok || stored.Token == "" {
+		return nil, fmt.Errorf("not logged in to %s — run `shh login`", apiURL)
 	}
 	session := &Session{
-		Token:   cfg.SessionToken,
-		OrgKeys: make(map[string][]byte),
+		Token:   stored.Token,
+		OrgKeys: make(map[string][]byte, len(stored.OrgKeys)),
 	}
-	if cfg.SessionKey != "" {
-		key, err := base64.RawURLEncoding.DecodeString(cfg.SessionKey)
+	if stored.SessionKey != "" {
+		key, err := base64.RawURLEncoding.DecodeString(stored.SessionKey)
 		if err != nil {
 			return nil, fmt.Errorf("decode session key: %w", err)
 		}
 		session.SessionKey = key
 	}
-	for orgID, encoded := range cfg.OrgKeys {
+	for orgID, encoded := range stored.OrgKeys {
 		key, err := base64.RawURLEncoding.DecodeString(encoded)
 		if err != nil {
 			return nil, fmt.Errorf("decode org key %s: %w", orgID, err)
@@ -46,33 +48,4 @@ func LoadSession() (*Session, error) {
 		session.OrgKeys[orgID] = key
 	}
 	return session, nil
-}
-
-func LoadSessionConfig() (*config.Config, *Session, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, nil, err
-	}
-	if cfg.SessionToken == "" {
-		return nil, nil, errors.New("not logged in — run `itsasecret login` first")
-	}
-	session := &Session{
-		Token:   cfg.SessionToken,
-		OrgKeys: make(map[string][]byte),
-	}
-	if cfg.SessionKey != "" {
-		key, err := base64.RawURLEncoding.DecodeString(cfg.SessionKey)
-		if err != nil {
-			return nil, nil, fmt.Errorf("decode session key: %w", err)
-		}
-		session.SessionKey = key
-	}
-	for orgID, encoded := range cfg.OrgKeys {
-		key, err := base64.RawURLEncoding.DecodeString(encoded)
-		if err != nil {
-			return nil, nil, fmt.Errorf("decode org key %s: %w", orgID, err)
-		}
-		session.OrgKeys[orgID] = key
-	}
-	return cfg, session, nil
 }

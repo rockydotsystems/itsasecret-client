@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 
@@ -71,4 +72,24 @@ func (rs *resolvedScope) apiURL(cfg *config.Config) string {
 		return rs.files.API
 	}
 	return cfg.APIURL
+}
+
+// resolveSession resolves the scope, the effective API URL, and the stored
+// session for that server — the preamble shared by every authenticated,
+// environment-scoped command.
+func (s *scopeFlags) resolveSession() (*resolvedScope, string, *auth.Session, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, "", nil, err
+	}
+	rs, err := s.resolveScope()
+	if err != nil {
+		return nil, "", nil, err
+	}
+	apiURL := rs.apiURL(cfg)
+	session, err := auth.SessionFor(cfg, apiURL)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	return rs, apiURL, session, nil
 }

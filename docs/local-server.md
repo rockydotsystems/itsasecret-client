@@ -90,12 +90,10 @@ global config, and `shh config get api` shows which one is in effect.
 directory (`$XDG_CONFIG_HOME/itsasecret/`, defaulting to
 `~/.config/itsasecret/`):
 
-| Field          | Purpose                                                        |
-| -------------- | ------------------------------------------------------------- |
-| `apiUrl`       | Server the CLI targets (set by `shh config set api`).         |
-| `sessionToken` | Bearer token for the server-side session.                     |
-| `sessionKey`   | ECDH-derived transport key; decrypts secrets returned by pull.|
-| `orgKeys`      | Per-org keys unwrapped at login (transport flow).             |
+| Field      | Purpose                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| `apiUrl`   | Server the CLI targets by default (set by `shh config set api`).                                  |
+| `sessions` | Per-server sessions keyed by API URL — token, ECDH transport key, unwrapped org keys. Logging in to local doesn't disturb your production session (or vice versa). |
 
 The file is written with `0600` permissions. To use a throwaway config without
 touching your real one, override the config directory for the session:
@@ -226,12 +224,14 @@ direnv allow
 
 ## Switching back to production
 
-Point the config back at production and log in again:
+Point the config back at production:
 
 ```sh
 shh config set api https://itsasecret.dev
-shh login
 ```
+
+Sessions are stored per server, so if you were logged in to production before,
+it still works — no new `shh login` needed.
 
 Or remove the config file to reset entirely:
 
@@ -245,7 +245,7 @@ rm ~/.config/itsasecret/config.json
 | ----------------------------------------- | --------------------------------------------------------------------- |
 | `login failed: ... HTTP 401`              | Wrong credentials, or the account does not exist in the local DB.     |
 | `HTTP 403` (`Email not verified`)         | Verify the account first (link is printed to the server terminal).    |
-| `not logged in — run itsasecret login`    | No session in the config file; run `shh login` (after `shh config set api` for local). |
+| `not logged in to <url> — run shh login`  | No session for that server; run `shh login` (after `shh config set api` for local). |
 | `environment "<name>" not found`          | The env name does not exist in that project; check `--env`.           |
 | `get secret: HTTP 404`                    | The key does not exist in that environment.                           |
 | Connection refused                        | The `www` dev server is not running on `http://localhost:3000`.       |
