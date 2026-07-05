@@ -10,6 +10,8 @@ env vars/secrets across environments, populates `.env` files or shell env
 
 - **Language**: Go (single static binary, cross-compilable)
 - **CLI framework**: cobra
+- **Interactive prompts**: charmbracelet/huh (select TUI; falls back to huh's
+  accessible numbered prompts when stdin isn't a TTY, e.g. pipes/tests)
 - **Crypto**: stdlib + vetted third-party (Argon2id, AES-GCM/XChaCha20-Poly1305)
 - **API client**: generated from the www Worker's OpenAPI spec (`@hono/zod-openapi` on the server side → `oapi-codegen` or hand-written typed client on this side)
 

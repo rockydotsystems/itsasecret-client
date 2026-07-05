@@ -1,18 +1,18 @@
 package commands
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
-	"strings"
 
 	"itsasecret.dev/cli/internal/api"
 	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/localcfg"
 
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +53,7 @@ resolves to.`,
 					return nil
 				}
 				client := api.NewClient(cfg.APIURL).WithToken(session.Token)
-				return interactiveLink(cmd.Context(), client, bufio.NewReader(cmd.InOrStdin()), out, cwd)
+				return interactiveLink(cmd.Context(), client, cmd.InOrStdin(), out, cwd)
 			}
 
 			if project != "" {
@@ -111,7 +111,7 @@ func linkEnv(out io.Writer, cwd, env string) error {
 
 // interactiveLink walks the logged-in user through org → project → env
 // selection and writes the marker files.
-func interactiveLink(ctx context.Context, client *api.Client, in *bufio.Reader, out io.Writer, cwd string) error {
+func interactiveLink(ctx context.Context, client *api.Client, in io.Reader, out io.Writer, cwd string) error {
 	scope, err := localcfg.Find(cwd)
 	if err != nil {
 		return err
@@ -129,11 +129,11 @@ func interactiveLink(ctx context.Context, client *api.Client, in *bufio.Reader, 
 	}
 	orgIdx := 0
 	if len(orgs) > 1 {
-		names := make([]string, len(orgs))
+		opts := make([]huh.Option[int], len(orgs))
 		for i, o := range orgs {
-			names[i] = o.Name
+			opts[i] = huh.NewOption(o.Name, i)
 		}
-		orgIdx, err = promptChoice(in, out, "Select an org:", names, false)
+		orgIdx, err = selectIndex(ctx, in, out, "Select an org", opts)
 		if err != nil {
 			return err
 		}
@@ -150,11 +150,11 @@ func interactiveLink(ctx context.Context, client *api.Client, in *bufio.Reader, 
 	}
 	projIdx := 0
 	if len(projects) > 1 {
-		names := make([]string, len(projects))
+		opts := make([]huh.Option[int], len(projects))
 		for i, p := range projects {
-			names[i] = fmt.Sprintf("%s (%s)", p.Name, p.ID)
+			opts[i] = huh.NewOption(fmt.Sprintf("%s (%s)", p.Name, p.ID), i)
 		}
-		projIdx, err = promptChoice(in, out, "Select a project:", names, false)
+		projIdx, err = selectIndex(ctx, in, out, "Select a project", opts)
 		if err != nil {
 			return err
 		}
@@ -173,11 +173,12 @@ func interactiveLink(ctx context.Context, client *api.Client, in *bufio.Reader, 
 		sayln(out, "Project has no environments — skipping environment link.")
 		return nil
 	}
-	names := make([]string, len(envs))
+	opts := make([]huh.Option[int], 0, len(envs)+1)
 	for i, e := range envs {
-		names[i] = e.Name
+		opts = append(opts, huh.NewOption(e.Name, i))
 	}
-	envIdx, err := promptChoice(in, out, "Select an environment:", names, true)
+	opts = append(opts, huh.NewOption("skip — don't pin an environment", -1))
+	envIdx, err := selectIndex(ctx, in, out, "Select an environment", opts)
 	if err != nil {
 		return err
 	}
@@ -188,42 +189,38 @@ func interactiveLink(ctx context.Context, client *api.Client, in *bufio.Reader, 
 	return linkEnv(out, cwd, envs[envIdx].Name)
 }
 
-// promptChoice prints a numbered list and reads a 1-based selection,
-// re-prompting on invalid input. With allowSkip, an empty line returns -1.
-func promptChoice(in *bufio.Reader, out io.Writer, label string, options []string, allowSkip bool) (int, error) {
-	sayln(out, label)
-	for i, o := range options {
-		say(out, "  [%d] %s\n", i+1, o)
+// selectIndex prompts for one of options with a huh select: a full TUI when
+// the input is a terminal, huh's accessible numbered-prompt mode when it's a
+// pipe or a test reader.
+func selectIndex(ctx context.Context, in io.Reader, out io.Writer, title string, options []huh.Option[int]) (int, error) {
+	var idx int
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[int]().Title(title).Options(options...).Value(&idx),
+	)).WithInput(in).WithOutput(out)
+	if f, ok := in.(*os.File); !ok || !term.IsTerminal(f.Fd()) {
+		// Accessible mode reads one line per prompt, but buffers the reader
+		// per field — byte-wise reads keep the rest of a piped script intact
+		// for the next prompt.
+		form = form.WithInput(oneByteReader{in}).WithAccessible(true)
 	}
-	for {
-		if allowSkip {
-			say(out, "Choice [1-%d, empty to skip]: ", len(options))
-		} else {
-			say(out, "Choice [1-%d]: ", len(options))
+	if err := form.RunWithContext(ctx); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return 0, errors.New("link aborted")
 		}
-		line, err := in.ReadString('\n')
-		if err != nil && line == "" {
-			return 0, fmt.Errorf("reading selection: %w", err)
-		}
-		line = strings.TrimSpace(line)
-		if line == "" {
-			if allowSkip {
-				return -1, nil
-			}
-			continue
-		}
-		n, convErr := strconv.Atoi(line)
-		if convErr != nil || n < 1 || n > len(options) {
-			say(out, "Enter a number between 1 and %d.\n", len(options))
-			if err != nil {
-				// The reader is exhausted (EOF with a trailing partial line);
-				// re-prompting would loop forever.
-				return 0, fmt.Errorf("invalid selection %q", line)
-			}
-			continue
-		}
-		return n - 1, nil
+		return 0, err
 	}
+	return idx, nil
+}
+
+// oneByteReader yields a single byte per Read so line-buffered consumers
+// never read past the newline they stop at.
+type oneByteReader struct{ r io.Reader }
+
+func (r oneByteReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	return r.r.Read(p[:1])
 }
 
 func printLinkStatus(out io.Writer, cwd string) error {

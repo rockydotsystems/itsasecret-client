@@ -105,15 +105,19 @@ directory once. When logged in, run it bare to pick interactively:
 
 ```sh
 shh link
-# Select a project:
-#   [1] www (gh6p5a84k3xvv8mdjlkrou7x)
-#   [2] client (m2k9d0q1x7v5p8n4j6r3t1wz)
-# Choice [1-2]: 2
-# Select an environment:
-#   [1] production
-#   [2] staging
-# Choice [1-2, empty to skip]: 2
+# Select a project
+# > www (gh6p5a84k3xvv8mdjlkrou7x)
+#   client (m2k9d0q1x7v5p8n4j6r3t1wz)
+#
+# Select an environment
+# > production
+#   staging
+#   skip — don't pin an environment
 ```
+
+The pickers are arrow-key menus (charmbracelet/huh); single-option steps are
+selected automatically. When stdin is not a terminal the pickers fall back to
+numbered prompts read line by line.
 
 Or non-interactively with flags:
 

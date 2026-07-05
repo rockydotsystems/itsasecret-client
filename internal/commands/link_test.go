@@ -149,8 +149,8 @@ func TestLinkInteractiveSkipEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	// org acme → project www (proj1) → empty line skips the env
-	out, err := runLink(t, "1\n1\n\n")
+	// org acme → project www (proj1) → option 4 is the explicit env skip
+	out, err := runLink(t, "1\n1\n4\n")
 	if err != nil {
 		t.Fatalf("link failed: %v\noutput:\n%s", err, out)
 	}
@@ -172,11 +172,11 @@ func TestLinkInteractiveReprompsOnInvalidInput(t *testing.T) {
 	t.Chdir(dir)
 
 	// "9" and "nope" are invalid org choices; the prompt retries until "1".
-	out, err := runLink(t, "9\nnope\n1\n1\n\n")
+	out, err := runLink(t, "9\nnope\n1\n1\n4\n")
 	if err != nil {
 		t.Fatalf("link failed: %v\noutput:\n%s", err, out)
 	}
-	if !strings.Contains(out, "Enter a number between 1 and 2.") {
+	if !strings.Contains(out, "must be a number between 1 and 2") {
 		t.Errorf("expected re-prompt message in output:\n%s", out)
 	}
 	if got := readFileOrEmpty(t, filepath.Join(dir, localcfg.ProjectFile)); got != "proj1\n" {
