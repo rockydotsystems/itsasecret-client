@@ -167,7 +167,7 @@ func TestConfigMenuShow(t *testing.T) {
 	for _, want := range []string{
 		"server url: " + srv.URL + " (global)",
 		"https://secrets.example.com (override from " + markerPath,
-		srv.URL + " — logged in as you@example.com (session verified)",
+		srv.URL + " | logged in as you@example.com (session verified)",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
@@ -185,7 +185,7 @@ func TestConfigMenuShowExpiredSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config menu failed: %v\noutput:\n%s", err, out)
 	}
-	if !strings.Contains(out, srv.URL+" — session expired — the next command asks for your master password") {
+	if !strings.Contains(out, srv.URL+" | session expired - the next command asks for your master password") {
 		t.Errorf("expected an expired-session line, got:\n%s", out)
 	}
 }

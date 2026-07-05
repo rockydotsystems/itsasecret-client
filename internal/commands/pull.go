@@ -98,7 +98,7 @@ func validateShellDialect(dialect string) error {
 	return fmt.Errorf("unknown shell dialect %q (expected %s)", dialect, strings.Join(shellDialects, ", "))
 }
 
-// detectShellDialect resolves a bare --shell. Inside direnv POSIX is forced —
+// detectShellDialect resolves a bare --shell. Inside direnv POSIX is forced -
 // .envrc is always evaluated by bash, and $SHELL still names the login shell
 // there, which would lie (e.g. a nushell user's direnv would get nu JSON fed
 // to bash). Otherwise the login shell decides.
@@ -143,7 +143,7 @@ func runPull(ctx context.Context, client *api.Client, project, env string, pc lo
 	if err != nil {
 		return err
 	}
-	// The .env file stays POSIX — it's meant for `source` and direnv.
+	// The .env file stays POSIX - it's meant for `source` and direnv.
 	if err := writeExports(f, vars, "posix"); err != nil {
 		_ = f.Close()
 		return err
@@ -190,7 +190,7 @@ func writeExports(w io.Writer, vars map[string]string, dialect string) error {
 }
 
 // recordPull remembers the delivery mode in the resolved .shh.project so
-// `shh reload` can repeat it. Only a pull of the linked scope is recorded —
+// `shh reload` can repeat it. Only a pull of the linked scope is recorded -
 // a one-off --project/--env override describes a different pull than the one
 // `shh reload` (which always targets the linked project and env) would
 // repeat. Best-effort: a pull that worked shouldn't fail because the marker

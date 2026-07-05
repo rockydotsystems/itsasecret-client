@@ -38,11 +38,11 @@ func ensureSession(ctx context.Context, cmd *cobra.Command, cfg *config.Config, 
 func unlock(ctx context.Context, cmd *cobra.Command, cfg *config.Config, apiURL, reason string) (*auth.Session, error) {
 	in, out, cleanup, err := promptIO(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("%s and no terminal is available to ask for the master password — run any shh command in a terminal to unlock (or `shh login`)", reason)
+		return nil, fmt.Errorf("%s and no terminal is available to ask for the master password - run any shh command in a terminal to unlock (or `shh login`)", reason)
 	}
 	defer cleanup()
 
-	say(out, "%s — enter your master password to unlock.\n", reason)
+	say(out, "%s - enter your master password to unlock.\n", reason)
 	stored, _ := cfg.Session(apiURL)
 	session, email, err := promptLogin(ctx, in, out, apiURL, stored.Email)
 	if err != nil {
@@ -96,7 +96,7 @@ func promptIO(cmd *cobra.Command) (io.Reader, io.Writer, func(), error) {
 }
 
 // promptLogin asks for credentials (email skipped when already known) and
-// performs the full login handshake, which also refreshes org keys — both
+// performs the full login handshake, which also refreshes org keys - both
 // the server-side session map and the master-wrapped local copies.
 func promptLogin(ctx context.Context, in io.Reader, out io.Writer, apiURL, email string) (*auth.Session, string, error) {
 	if email == "" {
@@ -112,7 +112,7 @@ func promptLogin(ctx context.Context, in io.Reader, out io.Writer, apiURL, email
 	}
 	var password string
 	// Masked input needs a real terminal; huh's accessible mode (pipes,
-	// tests) can only read plain lines — real non-TTY runs never get here
+	// tests) can only read plain lines - real non-TTY runs never get here
 	// (see canPrompt).
 	echoMode := huh.EchoModePassword
 	if !isTerminalReader(in) {
@@ -133,7 +133,7 @@ func promptLogin(ctx context.Context, in io.Reader, out io.Writer, apiURL, email
 	}
 
 	if email == "" || password == "" {
-		return nil, "", fmt.Errorf("not logged in to %s — no credentials entered (run `shh login`)", apiURL)
+		return nil, "", fmt.Errorf("not logged in to %s - no credentials entered (run `shh login`)", apiURL)
 	}
 	session, err := auth.Login(ctx, api.NewClient(apiURL), email, password)
 	if err != nil {
@@ -150,7 +150,7 @@ func isTerminalReader(in io.Reader) bool {
 
 // clientFor builds the API client every authenticated command must use: it
 // carries the token and transport key, and persists rolled tokens the moment
-// they arrive — losing one would lock the session out after the grace window.
+// they arrive - losing one would lock the session out after the grace window.
 func clientFor(cfg *config.Config, apiURL string, session *auth.Session) *api.Client {
 	return api.NewClient(apiURL).
 		WithToken(session.Token).

@@ -35,7 +35,7 @@ jobs:
           printf '{"version":"%s","commit":"%s","builtAt":"%s"}\n' \
             "$version" "$(git rev-parse HEAD)" "$(date -u +%FT%TZ)" > dist/version.json
 
-      # Straight to the Railway bucket — no GitHub artifacts. The www app
+      # Straight to the Railway bucket - no GitHub artifacts. The www app
       # serves these via presigned redirects at /api/dl/<name>.
       - name: Upload to bucket
         env:

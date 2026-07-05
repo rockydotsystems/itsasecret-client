@@ -19,7 +19,7 @@ func newLoginCmd() *cobra.Command {
 		Long: `Authenticate and start a rolling session for this server.
 
 The server comes from a ` + "`url =`" + ` line in ` + localcfg.ProjectFile + ` (if the current
-directory tree has one) or the machine-global config — change either with
+directory tree has one) or the machine-global config - change either with
 ` + "`shh config`" + `. Sessions are per-server and roll: every successful command
 refreshes the session, and after ~30 idle minutes the next command asks for
 your master password again.`,

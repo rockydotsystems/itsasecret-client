@@ -101,7 +101,7 @@ func Load() (*Config, error) {
 		cfg.APIURL = "https://itsasecret.dev"
 	}
 	// Migrate a pre-multi-session config: the flat session belonged to the
-	// configured server. Its org keys were stored unwrapped — discard them.
+	// configured server. Its org keys were stored unwrapped - discard them.
 	// Persisted by the next Save.
 	if cfg.LegacySessionToken != "" {
 		if _, ok := cfg.Session(cfg.APIURL); !ok {

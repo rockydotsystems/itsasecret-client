@@ -1,5 +1,5 @@
 {
-  description = "itsasecret — Go CLI (itsasecret / shh)";
+  description = "itsasecret - Go CLI (itsasecret / shh)";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

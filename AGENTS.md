@@ -1,4 +1,4 @@
-# AGENTS.md — client (itsasecret CLI)
+# AGENTS.md - client (itsasecret CLI)
 
 ## What this is
 
@@ -30,17 +30,17 @@ go mod tidy                    # tidy deps (inside dev shell)
 
 To point the CLI at a locally running `www` server instead of production, see
 [`docs/local-server.md`](docs/local-server.md). In short: start the `www` dev
-server, then `shh config set url http://localhost:3000` and `shh login` — the
+server, then `shh config set url http://localhost:3000` and `shh login` - the
 URL persists to the config file, so later commands need no flag.
 
 ## CLI behavior (from docs/product-spec.md)
 
 - Binary name `itsasecret`, alias `shh`.
-- `shh secret set KEY=VALUE` / `shh var set KEY=VALUE` — values are set one at
+- `shh secret set KEY=VALUE` / `shh var set KEY=VALUE` - values are set one at
   a time (secrets encrypted client-side, vars plaintext); there is
   deliberately **no bulk `push`**. Read back with `shh secret get <key>` /
   `shh var get <key>`.
-- `shh pull --shell --project <project-id>` — populate env vars directly into
+- `shh pull --shell --project <project-id>` - populate env vars directly into
   shell (for `.envrc`/direnv). `--shell` takes an optional dialect
   (`--shell=posix|fish|nu|pwsh`; nu emits JSON for
   `load-env (... | from json)` since nushell has no eval); bare `--shell`
@@ -49,32 +49,32 @@ URL persists to the config file, so later commands need no flag.
   recorded as `pull = shell:<dialect>`; bare auto records `pull = shell` so
   reload re-detects for its own context. The written `.env` file is always
   POSIX.
-- `shh reload` — pull again, delivered the way the last `shh pull` here was.
+- `shh reload` - pull again, delivered the way the last `shh pull` here was.
   `pull` records its delivery in `.shh.project` (`pull = shell` or
   `pull = file:<path>`, path relative to the `.shh.project` dir), so reload
   writes to the same place from anywhere in the tree; shell mode re-emits
   exports for `eval "$(shh reload)"`. Reload always targets the linked scope
   (project from `.shh.project`, env from `.shh.env` as set by the last
   `shh link`, defaulting to production), and only pulls of that linked scope
-  update the record — one-off `--project`/`--env` overrides don't.
-- `shh config` — view/set the API server. Set once per machine (global
+  update the record - one-off `--project`/`--env` overrides don't.
+- `shh config` - view/set the API server. Set once per machine (global
   `config.json`), or per repo via a `url =` line in `.shh.project`
   (committed; for self-hosted servers). Bare `shh config` is an interactive
   menu: first an action picker (set the server URL / show the current
-  configuration — new actions slot in here as settings grow), then the chosen
+  configuration - new actions slot in here as settings grow), then the chosen
   flow. Session status is **verified live** against `/api/auth/me` (5s
   timeout), not guessed from the config file: show lists each stored session
   as "logged in as <email> (session verified)" / "session expired" /
   "couldn't verify (<err>)", and setting a URL ends with the same check for
   that server. `shh config set url <url> [--project]` and
   `shh config get url` are the direct forms. Resolution: `.shh.project` >
-  global > default. `shh login` has **no `--api` flag** — it uses the same
+  global > default. `shh login` has **no `--api` flag** - it uses the same
   resolution. Sessions are stored **per server** (`sessions` map in
   config.json, keyed by canonical API URL; legacy flat fields migrate on
   load), so logins against production, self-hosted, and local dev coexist and
   every command picks the session matching its resolved URL.
-- `shh link --project <id> [--env <name>]` — pins a directory to a project/
-  environment by writing `.shh.project` (committed, `key = value` lines —
+- `shh link --project <id> [--env <name>]` - pins a directory to a project/
+  environment by writing `.shh.project` (committed, `key = value` lines -
   `project`, optional `url` (legacy `api` alias parses), optional `pull`; a legacy bare-ID file still
   parses) and `.shh.env` (local, auto-added to `.gitignore`). Commands resolve scope as flag > `.shh.*` file
   (found by walking up from cwd, each file independently) > `production` for
@@ -92,7 +92,7 @@ URL persists to the config file, so later commands need no flag.
   minutes, and every successful command's response carries a fresh token
   (`X-New-Session-Token` + `X-Session-Expires-At`; old token keeps a 60s
   grace window) which the client persists immediately (`clientFor` token
-  saver — losing it locks the session out). After ~30 idle minutes the next
+  saver - losing it locks the session out). After ~30 idle minutes the next
   command prompts inline for the master password (`ensureSession` →
   `promptLogin`; email is remembered per server) and the full re-login also
   refreshes org keys. The prompt uses `promptIO`: stdin/stdout when both are
@@ -105,7 +105,7 @@ URL persists to the config file, so later commands need no flag.
   `api.Client.WithReauth`); server-side, rotation is a compare-and-swap on
   the current token hash so concurrent commands can't clobber each other's
   tokens (the loser's request still succeeds via the grace window).
-- **Local storage security**: config.json never holds unwrapped org keys —
+- **Local storage security**: config.json never holds unwrapped org keys -
   only master-password-wrapped blobs (`wrappedOrgKeys`, from login's
   `masterWrappedOrgKeys`); legacy plaintext `orgKeys` are scrubbed on load.
   The stored token + transport sessionKey are only useful for ≤30 minutes.
@@ -135,14 +135,14 @@ Every push to `main` runs `.github/workflows/release.yml` on a Blacksmith
 runner: cross-compiles `itsasecret_{linux,darwin}_{amd64,arm64}` (version
 stamped into `internal/commands.Version` via ldflags), writes
 `checksums.txt` + `version.json`, and uploads straight to the Railway
-bucket (`cli/latest/` prefix) — no GitHub artifacts. The `BUCKET_*` repo
+bucket (`cli/latest/` prefix) - no GitHub artifacts. The `BUCKET_*` repo
 secrets hold the bucket credentials. Users install via
 `curl -fsSL https://itsasecret.dev/install.sh | sh` (served by www, which
 redirects `/api/dl/<name>` to presigned bucket URLs).
 
 ## Version control
 
-This repo uses **jj** (Jujutsu). Use `jj new` to create new revisions — do not
+This repo uses **jj** (Jujutsu). Use `jj new` to create new revisions - do not
 write descriptions (the repo owner handles that). Don't use `git commit`.
 
 ## Conventions

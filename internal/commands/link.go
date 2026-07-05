@@ -27,8 +27,8 @@ func newLinkCmd() *cobra.Command {
 		Long: `Pin this directory to a project (and optionally an environment) so other
 commands don't need --project/--env flags.
 
-Writes ` + localcfg.ProjectFile + ` (the project ID — commit it) and ` + localcfg.EnvFile + `
-(the environment name — kept local, added to .gitignore). Commands look for
+Writes ` + localcfg.ProjectFile + ` (the project ID - commit it) and ` + localcfg.EnvFile + `
+(the environment name - kept local, added to .gitignore). Commands look for
 both files in the current directory and its parents.
 
 With no flags: when logged in, links interactively (pick a project and
@@ -57,7 +57,7 @@ resolves to.`,
 				}
 				session, err := ensureSession(cmd.Context(), cmd, cfg, apiURL)
 				if err != nil {
-					// Can't authenticate here (e.g. no terminal) — show the
+					// Can't authenticate here (e.g. no terminal) - show the
 					// current state instead.
 					if statusErr := printLinkStatus(out, cwd); statusErr != nil {
 						return statusErr
@@ -87,7 +87,7 @@ resolves to.`,
 	return cmd
 }
 
-// say / sayln write user-facing output, deliberately ignoring write errors —
+// say / sayln write user-facing output, deliberately ignoring write errors -
 // this is best-effort UX text, not data.
 func say(out io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintf(out, format, args...)
@@ -138,7 +138,7 @@ func interactiveLink(ctx context.Context, client *api.Client, in io.Reader, out 
 		return err
 	}
 	if len(orgs) == 0 {
-		return fmt.Errorf("this account has no orgs — create one on the website first")
+		return fmt.Errorf("this account has no orgs - create one on the website first")
 	}
 	orgIdx := 0
 	if len(orgs) > 1 {
@@ -159,7 +159,7 @@ func interactiveLink(ctx context.Context, client *api.Client, in io.Reader, out 
 		return err
 	}
 	if len(projects) == 0 {
-		return fmt.Errorf("org %s has no projects — create one on the website first", orgs[orgIdx].Name)
+		return fmt.Errorf("org %s has no projects - create one on the website first", orgs[orgIdx].Name)
 	}
 	projIdx := 0
 	if len(projects) > 1 {
@@ -183,20 +183,20 @@ func interactiveLink(ctx context.Context, client *api.Client, in io.Reader, out 
 		return err
 	}
 	if len(envs) == 0 {
-		sayln(out, "Project has no environments — skipping environment link.")
+		sayln(out, "Project has no environments - skipping environment link.")
 		return nil
 	}
 	opts := make([]huh.Option[int], 0, len(envs)+1)
 	for i, e := range envs {
 		opts = append(opts, huh.NewOption(e.Name, i))
 	}
-	opts = append(opts, huh.NewOption("skip — don't pin an environment", -1))
+	opts = append(opts, huh.NewOption("skip - don't pin an environment", -1))
 	envIdx, err := selectIndex(ctx, in, out, "Select an environment", opts)
 	if err != nil {
 		return err
 	}
 	if envIdx < 0 {
-		sayln(out, "Environment not linked — commands default to production.")
+		sayln(out, "Environment not linked - commands default to production.")
 		return nil
 	}
 	return linkEnv(out, cwd, envs[envIdx].Name)
@@ -208,7 +208,7 @@ func runField(ctx context.Context, in io.Reader, out io.Writer, field huh.Field)
 	form := huh.NewForm(huh.NewGroup(field)).WithInput(in).WithOutput(out)
 	if f, ok := in.(*os.File); !ok || !term.IsTerminal(f.Fd()) {
 		// Accessible mode reads one line per prompt, but buffers the reader
-		// per field — byte-wise reads keep the rest of a piped script intact
+		// per field - byte-wise reads keep the rest of a piped script intact
 		// for the next prompt.
 		form = form.WithInput(oneByteReader{in}).WithAccessible(true)
 	}
@@ -254,7 +254,7 @@ func printLinkStatus(out io.Writer, cwd string) error {
 	if scope.Project != "" {
 		say(out, "project:     %s (%s)\n", scope.Project, scope.ProjectPath)
 	} else {
-		sayln(out, "project:     not set — pass --project or run `shh link --project <id>`")
+		sayln(out, "project:     not set - pass --project or run `shh link --project <id>`")
 	}
 	if scope.Env != "" {
 		say(out, "environment: %s (%s)\n", scope.Env, scope.EnvPath)

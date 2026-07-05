@@ -14,7 +14,7 @@ type Session struct {
 	ExpiresAt  time.Time
 	SessionKey []byte
 	// WrappedOrgKeys are the orgs' keys wrapped under the user's
-	// master-password-derived key — safe to persist, useless without the
+	// master-password-derived key - safe to persist, useless without the
 	// master password.
 	WrappedOrgKeys map[string]string
 }

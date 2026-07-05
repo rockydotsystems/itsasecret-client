@@ -38,14 +38,14 @@ func TestLoadMigratesLegacySession(t *testing.T) {
 	if !ok || s.Token != "legacy-token" || s.SessionKey != "a2V5" {
 		t.Errorf("migrated session = %+v (found %v), want the legacy token/key under the configured URL", s, ok)
 	}
-	// Legacy org keys were stored unwrapped — they must NOT survive migration.
+	// Legacy org keys were stored unwrapped - they must NOT survive migration.
 	if len(s.LegacyOrgKeys) != 0 || len(s.WrappedOrgKeys) != 0 {
-		t.Errorf("migrated session carries org keys (%+v) — plaintext keys must be discarded", s)
+		t.Errorf("migrated session carries org keys (%+v) - plaintext keys must be discarded", s)
 	}
 	if cfg.LegacySessionToken != "" {
 		t.Error("legacy fields should be cleared after migration")
 	}
-	// A flat session has no expiry — it must count as expired so the next
+	// A flat session has no expiry - it must count as expired so the next
 	// command re-authenticates into a rolling session.
 	if !s.Expired() {
 		t.Error("migrated legacy session should be treated as expired")

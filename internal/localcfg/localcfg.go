@@ -79,7 +79,7 @@ type Scope struct {
 
 // Find resolves .shh.project and .shh.env starting at dir and walking up
 // parent directories to the filesystem root. Each file is resolved
-// independently — the closest one wins — so a nested project can override
+// independently - the closest one wins - so a nested project can override
 // just one of the two.
 func Find(dir string) (*Scope, error) {
 	dir, err := filepath.Abs(dir)

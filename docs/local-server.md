@@ -59,7 +59,7 @@ you prefer. Note that direnv (`.envrc`) requires a real binary path, not the
 
 ## Pointing the CLI at local
 
-The target server is set once per machine with `shh config` — run it bare for
+The target server is set once per machine with `shh config` - run it bare for
 an interactive menu, or set it directly:
 
 ```sh
@@ -80,7 +80,7 @@ shh secret list --project <project-id>
 ```
 
 A repo can also pin its server by committing a `url =` line in
-`.shh.project` — `shh config set url <url> --project` writes it (or pick
+`.shh.project` - `shh config set url <url> --project` writes it (or pick
 "this project" in the bare `shh config` menu). The project override beats the
 global config, and `shh config get url` shows which one is in effect.
 
@@ -93,11 +93,11 @@ directory (`$XDG_CONFIG_HOME/itsasecret/`, defaulting to
 | Field      | Purpose                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------ |
 | `apiUrl`   | Server the CLI targets by default (set by `shh config set url`).                                  |
-| `sessions` | Per-server sessions keyed by API URL — rolling token + expiry, account email, ECDH transport key, and org keys **wrapped under your master password** (never plaintext). Logging in to local doesn't disturb your production session (or vice versa). |
+| `sessions` | Per-server sessions keyed by API URL - rolling token + expiry, account email, ECDH transport key, and org keys **wrapped under your master password** (never plaintext). Logging in to local doesn't disturb your production session (or vice versa). |
 
 Sessions roll: every successful command refreshes the token, valid for 30
 minutes. After ~30 idle minutes the next command asks for your master
-password inline (email is remembered) and re-unlocks — this also refreshes
+password inline (email is remembered) and re-unlocks - this also refreshes
 org keys, so newly joined orgs appear. The prompt opens the controlling
 terminal (`/dev/tty`) directly, sudo-style, so it also works when stdout is
 captured (direnv, `eval "$(shh pull --shell)"`) or stdin is a pipe. Only
@@ -127,7 +127,7 @@ shh link
 # Select an environment
 # > production
 #   staging
-#   skip — don't pin an environment
+#   skip - don't pin an environment
 ```
 
 The pickers are arrow-key menus (charmbracelet/huh); single-option steps are
@@ -140,8 +140,8 @@ Or non-interactively with flags:
 shh link --project <project-id> --env staging
 ```
 
-Either way this writes `.shh.project` (the project ID — commit it) and
-`.shh.env` (the environment name — local to your machine, automatically added
+Either way this writes `.shh.project` (the project ID - commit it) and
+`.shh.env` (the environment name - local to your machine, automatically added
 to `.gitignore`). Commands look for both files in the current directory and
 its parents, so linking a repo root covers every subdirectory. Explicit flags
 always override the files. When not logged in, bare `shh link` prints what
@@ -204,7 +204,7 @@ load-env (shh pull --shell | from json)      # nushell → JSON (nu has no eval)
 
 `shh pull` records how it delivered values in `.shh.project` (`pull = shell`
 or `pull = file:<path>`, the path relative to the `.shh.project` directory).
-`shh reload` repeats that delivery — no flags needed, from anywhere in the
+`shh reload` repeats that delivery - no flags needed, from anywhere in the
 tree:
 
 ```sh
@@ -220,7 +220,7 @@ bare reload keeps reproducing the linked scope's last pull.
 ### direnv (`.envrc`)
 
 Add the pull to `.envrc` so values load automatically on `cd`. direnv runs the
-`.envrc` in a non-interactive shell, so reference the binary by absolute path —
+`.envrc` in a non-interactive shell, so reference the binary by absolute path -
 a shell alias will not be visible:
 
 ```sh
@@ -243,7 +243,7 @@ shh config set url https://itsasecret.dev
 ```
 
 Sessions are stored per server, so if you were logged in to production before,
-it still works — no new `shh login` needed.
+it still works - no new `shh login` needed.
 
 Or remove the config file to reset entirely:
 
@@ -257,8 +257,8 @@ rm ~/.config/itsasecret/config.json
 | ----------------------------------------- | --------------------------------------------------------------------- |
 | `login failed: ... HTTP 401`              | Wrong credentials, or the account does not exist in the local DB.     |
 | `HTTP 403` (`Email not verified`)         | Verify the account first (link is printed to the server terminal).    |
-| `not logged in to <url> — run shh login`  | No session for that server; run `shh login` (after `shh config set url` for local). |
-| `session for <url> expired and no terminal is available…` | Idle >30 min in a headless context (CI, no controlling terminal). In a terminal — even under direnv — the master-password prompt appears on `/dev/tty` instead. |
+| `not logged in to <url> - run shh login`  | No session for that server; run `shh login` (after `shh config set url` for local). |
+| `session for <url> expired and no terminal is available…` | Idle >30 min in a headless context (CI, no controlling terminal). In a terminal - even under direnv - the master-password prompt appears on `/dev/tty` instead. |
 | `session for <url> was rejected by the server…` | The stored token is no longer valid (e.g. a rolled token was lost when a command was interrupted). The same master-password prompt unlocks and the command retries automatically. |
 | `environment "<name>" not found`          | The env name does not exist in that project; check `--env`.           |
 | `get secret: HTTP 404`                    | The key does not exist in that environment.                           |

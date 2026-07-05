@@ -77,7 +77,7 @@ func TestExpiredSessionPromptsForMasterPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
 	}
-	if !strings.Contains(out, "expired — enter your master password") {
+	if !strings.Contains(out, "expired - enter your master password") {
 		t.Errorf("expected an unlock prompt, got:\n%s", out)
 	}
 	if !strings.Contains(out, "Unlocked "+srv.URL) {
@@ -100,7 +100,7 @@ func TestRejectedTokenPromptsAndRetries(t *testing.T) {
 	srv := startFakeServer(t)
 	setupConfig(t, srv.URL, false)
 	// The token looks fresh locally (future expiry) but the server rejects
-	// it — e.g. a rolled token that was never saved, past its grace window.
+	// it - e.g. a rolled token that was never saved, past its grace window.
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +119,7 @@ func TestRejectedTokenPromptsAndRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
 	}
-	if !strings.Contains(out, "rejected by the server — enter your master password") {
+	if !strings.Contains(out, "rejected by the server - enter your master password") {
 		t.Errorf("expected a rejected-session unlock prompt, got:\n%s", out)
 	}
 	if !strings.Contains(out, "export FOO='bar'") {

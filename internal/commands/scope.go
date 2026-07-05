@@ -77,7 +77,7 @@ func (rs *resolvedScope) apiURL(cfg *config.Config) string {
 // resolveClient resolves the scope and the effective server URL, ensures a
 // live session for it (prompting for the master password when the rolling
 // session has idled out), and returns a ready API client that persists
-// rolled tokens — the preamble shared by every authenticated,
+// rolled tokens - the preamble shared by every authenticated,
 // environment-scoped command.
 func (s *scopeFlags) resolveClient(cmd *cobra.Command) (*resolvedScope, *api.Client, error) {
 	cfg, err := config.Load()

@@ -51,15 +51,15 @@ func (c *Client) WithTokenSaver(fn func(token string, expiresAt time.Time)) *Cli
 
 // WithReauth registers a recovery callback for rejected sessions: when the
 // server answers 401 (rolled token lost, session revoked or expired
-// server-side) the callback re-authenticates — typically by prompting for
-// the master password — and the request is retried once with the fresh
+// server-side) the callback re-authenticates - typically by prompting for
+// the master password - and the request is retried once with the fresh
 // credentials.
 func (c *Client) WithReauth(fn func(ctx context.Context) (token string, sessionKey []byte, err error)) *Client {
 	c.onReauth = fn
 	return c
 }
 
-// ErrUnauthorized reports that the server rejected the session token — the
+// ErrUnauthorized reports that the server rejected the session token - the
 // session has expired or was revoked.
 var ErrUnauthorized = errors.New("session rejected by server")
 
@@ -102,7 +102,7 @@ type LoginResponse struct {
 	ServerPublicKey string            `json:"serverPubkey"`
 	WrappedOrgKeys  map[string]string `json:"orgKeys"`
 	// MasterWrappedOrgKeys are wrapped under the master-password-derived key
-	// — the only form of org keys the CLI persists.
+	// - the only form of org keys the CLI persists.
 	MasterWrappedOrgKeys map[string]string `json:"masterWrappedOrgKeys"`
 	SessionExpiresAt     time.Time         `json:"sessionExpiresAt"`
 }
@@ -233,7 +233,7 @@ func (c *Client) resolveEnvID(ctx context.Context, projectID, envName string) (s
 }
 
 // ListSecrets returns the secret keys in an environment, sorted. Values are
-// never returned by the list route — use `secret get` to reveal one.
+// never returned by the list route - use `secret get` to reveal one.
 func (c *Client) ListSecrets(ctx context.Context, projectID, envName string) ([]string, error) {
 	envID, err := c.resolveEnvID(ctx, projectID, envName)
 	if err != nil {
@@ -264,7 +264,7 @@ func (c *Client) ListSecrets(ctx context.Context, projectID, envName string) ([]
 
 func (c *Client) SetSecret(ctx context.Context, projectID, envName, key, value string) error {
 	if len(c.sessionKey) == 0 {
-		return fmt.Errorf("no session key — cannot encrypt secret")
+		return fmt.Errorf("no session key - cannot encrypt secret")
 	}
 	encrypted, err := crypto.EncryptString(c.sessionKey, value)
 	if err != nil {
@@ -293,7 +293,7 @@ func (c *Client) SetVar(ctx context.Context, projectID, envName, key, value stri
 
 func (c *Client) GetSecret(ctx context.Context, projectID, envName, key string) (string, error) {
 	if len(c.sessionKey) == 0 {
-		return "", fmt.Errorf("no session key — cannot decrypt secret")
+		return "", fmt.Errorf("no session key - cannot decrypt secret")
 	}
 	envID, err := c.resolveEnvID(ctx, projectID, envName)
 	if err != nil {

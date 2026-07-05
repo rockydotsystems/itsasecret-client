@@ -28,7 +28,7 @@ func newConfigCmd() *cobra.Command {
 
 The only setting today is the server URL. It is set once per machine
 (stored in the global config file); a repo can override it by committing a
-` + "`url =`" + ` line in ` + localcfg.ProjectFile + ` — useful for self-hosted servers.
+` + "`url =`" + ` line in ` + localcfg.ProjectFile + ` - useful for self-hosted servers.
 Every command resolves it as: ` + localcfg.ProjectFile + ` > global > default.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -66,7 +66,7 @@ func newConfigSetCmd() *cobra.Command {
 	var inProject bool
 	cmd := &cobra.Command{
 		Use:   "set url <url>",
-		Short: "Set the server URL once — globally, or in " + localcfg.ProjectFile,
+		Short: "Set the server URL once - globally, or in " + localcfg.ProjectFile,
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if args[0] != "url" {
@@ -127,10 +127,10 @@ func setGlobalURL(out io.Writer, cfg *config.Config, serverURL string) error {
 func sessionStatus(ctx context.Context, cfg *config.Config, serverURL string) string {
 	stored, ok := cfg.Session(serverURL)
 	if !ok || stored.Token == "" {
-		return "not logged in — run `shh login`"
+		return "not logged in - run `shh login`"
 	}
 	if stored.Expired() {
-		return "session idle-expired — the next command asks for your master password"
+		return "session idle-expired - the next command asks for your master password"
 	}
 	session, err := auth.SessionFor(cfg, serverURL)
 	if err != nil {
@@ -143,7 +143,7 @@ func sessionStatus(ctx context.Context, cfg *config.Config, serverURL string) st
 	case err == nil:
 		return "logged in as " + email + " (session verified)"
 	case errors.Is(err, api.ErrUnauthorized):
-		return "session expired — the next command asks for your master password"
+		return "session expired - the next command asks for your master password"
 	default:
 		return fmt.Sprintf("couldn't verify session (%v)", err)
 	}
@@ -155,7 +155,7 @@ func reportLoginStatus(ctx context.Context, out io.Writer, cfg *config.Config, s
 
 func setProjectURL(out io.Writer, files *localcfg.Scope, serverURL string) error {
 	if files.ProjectPath == "" {
-		return fmt.Errorf("no %s found here — run `shh link` first, or set it globally without --project", localcfg.ProjectFile)
+		return fmt.Errorf("no %s found here - run `shh link` first, or set it globally without --project", localcfg.ProjectFile)
 	}
 	if err := localcfg.SaveURL(files.ProjectPath, serverURL); err != nil {
 		return err
@@ -181,7 +181,7 @@ func runConfigMenu(cmd *cobra.Command) error {
 		huh.NewOption("set the server URL", actionSetURL),
 		huh.NewOption("show the current configuration", actionShow),
 	}
-	action, err := selectIndex(cmd.Context(), in, out, "itsasecret CLI configuration — what do you want to do?", actions)
+	action, err := selectIndex(cmd.Context(), in, out, "itsasecret CLI configuration - what do you want to do?", actions)
 	if err != nil {
 		return err
 	}
@@ -199,10 +199,10 @@ func runConfigMenu(cmd *cobra.Command) error {
 func printConfigStatus(ctx context.Context, out io.Writer, cfg *config.Config, files *localcfg.Scope) {
 	say(out, "server url: %s (global)\n", cfg.APIURL)
 	if files.URL != "" {
-		say(out, "            %s (override from %s — commands here use this)\n", files.URL, files.ProjectPath)
+		say(out, "            %s (override from %s - commands here use this)\n", files.URL, files.ProjectPath)
 	}
 	if len(cfg.Sessions) == 0 {
-		sayln(out, "sessions:   none — run `shh login`")
+		sayln(out, "sessions:   none - run `shh login`")
 		return
 	}
 	urls := make([]string, 0, len(cfg.Sessions))
@@ -212,7 +212,7 @@ func printConfigStatus(ctx context.Context, out io.Writer, cfg *config.Config, f
 	sort.Strings(urls)
 	label := "sessions:  "
 	for _, u := range urls {
-		say(out, "%s %s — %s\n", label, u, sessionStatus(ctx, cfg, u))
+		say(out, "%s %s | %s\n", label, u, sessionStatus(ctx, cfg, u))
 		label = "           "
 	}
 }
@@ -246,7 +246,7 @@ func runSetURLMenu(cmd *cobra.Command, cfg *config.Config, files *localcfg.Scope
 	serverURL := current
 	field := huh.NewInput().
 		Title("Server URL").
-		Description("Set once — every command uses it from now on.").
+		Description("Set once - every command uses it from now on.").
 		Value(&serverURL).
 		Validate(validateServerURL)
 	if err := runField(cmd.Context(), in, out, field); err != nil {
@@ -276,7 +276,7 @@ func validateServerURL(s string) error {
 	return nil
 }
 
-// normalizeServerURL validates and canonicalizes the URL (no trailing slash —
+// normalizeServerURL validates and canonicalizes the URL (no trailing slash -
 // the API client appends absolute paths).
 func normalizeServerURL(s string) (string, error) {
 	if err := validateServerURL(s); err != nil {
