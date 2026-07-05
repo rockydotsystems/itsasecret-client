@@ -52,7 +52,13 @@ URL persists to the config file, so later commands need no flag.
 - `shh config` — view/set the API server. Set once per machine (global
   `config.json`), or per repo via a `url =` line in `.shh.project`
   (committed; for self-hosted servers). Bare `shh config` is an interactive
-  menu (scope picker + URL input); `shh config set url <url> [--project]` and
+  menu: first an action picker (set the server URL / show the current
+  configuration — new actions slot in here as settings grow), then the chosen
+  flow. Session status is **verified live** against `/api/auth/me` (5s
+  timeout), not guessed from the config file: show lists each stored session
+  as "logged in as <email> (session verified)" / "session expired" /
+  "couldn't verify (<err>)", and setting a URL ends with the same check for
+  that server. `shh config set url <url> [--project]` and
   `shh config get url` are the direct forms. Resolution: `.shh.project` >
   global > default. `shh login` has **no `--api` flag** — it uses the same
   resolution. Sessions are stored **per server** (`sessions` map in

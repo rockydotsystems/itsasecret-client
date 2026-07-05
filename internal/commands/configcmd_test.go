@@ -111,8 +111,9 @@ func TestConfigMenuGlobal(t *testing.T) {
 	setupConfig(t, "https://old.example.com", false)
 	t.Chdir(t.TempDir())
 
-	// No .shh.project → no scope question; just the URL input.
-	out, err := runCmd(t, "http://localhost:3000\n", "config")
+	// Action 1 = set the server URL; no .shh.project → no scope question,
+	// just the URL input.
+	out, err := runCmd(t, "1\nhttp://localhost:3000\n", "config")
 	if err != nil {
 		t.Fatalf("config menu failed: %v\noutput:\n%s", err, out)
 	}
@@ -129,8 +130,8 @@ func TestConfigMenuProjectScope(t *testing.T) {
 	}
 	t.Chdir(dir)
 
-	// Scope select: option 2 = this project; then the URL.
-	out, err := runCmd(t, "2\nhttps://secrets.example.com\n", "config")
+	// Action 1 = set; scope option 2 = this project; then the URL.
+	out, err := runCmd(t, "1\n2\nhttps://secrets.example.com\n", "config")
 	if err != nil {
 		t.Fatalf("config menu failed: %v\noutput:\n%s", err, out)
 	}
@@ -140,6 +141,67 @@ func TestConfigMenuProjectScope(t *testing.T) {
 	}
 	if got := readGlobalAPIURL(t); got != "https://global.example.com" {
 		t.Errorf("global apiUrl = %q, want it untouched", got)
+	}
+}
+
+func TestConfigMenuShow(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	dir := t.TempDir()
+	markerPath, err := localcfg.WriteProject(dir, "proj1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := localcfg.SaveURL(markerPath, "https://secrets.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	// Action 2 = show the current configuration; the session is verified
+	// live against the server, not just assumed from the config file.
+	out, err := runCmd(t, "2\n", "config")
+	if err != nil {
+		t.Fatalf("config menu failed: %v\noutput:\n%s", err, out)
+	}
+	for _, want := range []string{
+		"server url: " + srv.URL + " (global)",
+		"https://secrets.example.com (override from " + markerPath,
+		srv.URL + " — logged in as you@example.com (session verified)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestConfigMenuShowExpiredSession(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, false)
+	addSessionToken(t, srv.URL, "expired-token")
+	t.Chdir(t.TempDir())
+
+	out, err := runCmd(t, "2\n", "config")
+	if err != nil {
+		t.Fatalf("config menu failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(out, srv.URL+" — session expired — run `shh login`") {
+		t.Errorf("expected an expired-session line, got:\n%s", out)
+	}
+}
+
+func TestConfigSetVerifiesExistingSession(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, true)
+	t.Chdir(t.TempDir())
+
+	// Re-setting the URL of a server we're logged in to verifies the
+	// session instead of telling the user to log in.
+	out, err := runCmd(t, "", "config", "set", "url", srv.URL)
+	if err != nil {
+		t.Fatalf("config set failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(out, "logged in as you@example.com (session verified)") {
+		t.Errorf("expected a verified-session line, got:\n%s", out)
 	}
 }
 
@@ -172,11 +234,16 @@ func TestPullUsesProjectAPIOverride(t *testing.T) {
 // setupConfig wrote.
 func addSession(t *testing.T, apiURL string) {
 	t.Helper()
+	addSessionToken(t, apiURL, "test-token")
+}
+
+func addSessionToken(t *testing.T, apiURL, token string) {
+	t.Helper()
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.SetSession(apiURL, config.StoredSession{Token: "test-token"})
+	cfg.SetSession(apiURL, config.StoredSession{Token: token})
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}

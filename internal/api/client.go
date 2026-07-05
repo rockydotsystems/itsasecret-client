@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,6 +36,35 @@ func (c *Client) WithToken(token string) *Client {
 func (c *Client) WithSessionKey(key []byte) *Client {
 	c.sessionKey = key
 	return c
+}
+
+// ErrUnauthorized reports that the server rejected the session token — the
+// session has expired or was revoked.
+var ErrUnauthorized = errors.New("session rejected by server")
+
+// Me returns the logged-in user's email, or ErrUnauthorized when the session
+// token is no longer valid.
+func (c *Client) Me(ctx context.Context) (string, error) {
+	resp, err := c.do(ctx, "GET", "/api/auth/me", nil)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return "", ErrUnauthorized
+	}
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("me: HTTP %d", resp.StatusCode)
+	}
+	var out struct {
+		User struct {
+			Email string `json:"email"`
+		} `json:"user"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	return out.User.Email, nil
 }
 
 type LoginRequest struct {

@@ -32,6 +32,13 @@ func startFakeServer(t *testing.T) *httptest.Server {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/auth/me", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		writeJSON(w, map[string]any{"user": map[string]string{"email": "you@example.com"}})
+	})
 	mux.HandleFunc("GET /api/orgs/{$}", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAuth(w, r) {
 			return

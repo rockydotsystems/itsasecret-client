@@ -1,12 +1,18 @@
 package commands
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
+	"time"
 
+	"itsasecret.dev/cli/internal/api"
+	"itsasecret.dev/cli/internal/auth"
 	"itsasecret.dev/cli/internal/config"
 	"itsasecret.dev/cli/internal/localcfg"
 
@@ -76,9 +82,14 @@ func newConfigSetCmd() *cobra.Command {
 				return err
 			}
 			if inProject {
-				return setProjectURL(out, files, serverURL)
+				if err := setProjectURL(out, files, serverURL); err != nil {
+					return err
+				}
+			} else if err := setGlobalURL(out, cfg, serverURL); err != nil {
+				return err
 			}
-			return setGlobalURL(out, cfg, serverURL)
+			reportLoginStatus(cmd.Context(), out, cfg, serverURL)
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&inProject, "project", false, "save in the resolved "+localcfg.ProjectFile+" instead of the global config")
@@ -107,8 +118,32 @@ func setGlobalURL(out io.Writer, cfg *config.Config, serverURL string) error {
 		return err
 	}
 	say(out, "Server URL set to %s for this machine.\n", serverURL)
-	sayln(out, "Run `shh login` if you haven't authenticated against it yet.")
 	return nil
+}
+
+// sessionStatus verifies a stored session for serverURL against the server
+// (via /api/auth/me) and describes the result, instead of guessing at a
+// login hint.
+func sessionStatus(ctx context.Context, cfg *config.Config, serverURL string) string {
+	session, err := auth.SessionFor(cfg, serverURL)
+	if err != nil {
+		return "not logged in — run `shh login`"
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	email, err := api.NewClient(serverURL).WithToken(session.Token).Me(ctx)
+	switch {
+	case err == nil:
+		return "logged in as " + email + " (session verified)"
+	case errors.Is(err, api.ErrUnauthorized):
+		return "session expired — run `shh login`"
+	default:
+		return fmt.Sprintf("couldn't verify session (%v)", err)
+	}
+}
+
+func reportLoginStatus(ctx context.Context, out io.Writer, cfg *config.Config, serverURL string) {
+	say(out, "Session: %s.\n", sessionStatus(ctx, cfg, serverURL))
 }
 
 func setProjectURL(out io.Writer, files *localcfg.Scope, serverURL string) error {
@@ -122,8 +157,8 @@ func setProjectURL(out io.Writer, files *localcfg.Scope, serverURL string) error
 	return nil
 }
 
-// runConfigMenu interactively sets the server URL: pick the scope (machine
-// vs project), then enter the URL.
+// runConfigMenu is the interactive entry point: pick an action, then run its
+// flow. New settings and actions slot in as menu options.
 func runConfigMenu(cmd *cobra.Command) error {
 	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
 	cfg, files, err := loadConfigAndFiles()
@@ -131,12 +166,54 @@ func runConfigMenu(cmd *cobra.Command) error {
 		return err
 	}
 
-	sayln(out, "itsasecret CLI configuration")
+	const (
+		actionSetURL = iota
+		actionShow
+	)
+	actions := []huh.Option[int]{
+		huh.NewOption("set the server URL", actionSetURL),
+		huh.NewOption("show the current configuration", actionShow),
+	}
+	action, err := selectIndex(cmd.Context(), in, out, "itsasecret CLI configuration — what do you want to do?", actions)
+	if err != nil {
+		return err
+	}
+
+	switch action {
+	case actionShow:
+		printConfigStatus(cmd.Context(), out, cfg, files)
+		return nil
+	case actionSetURL:
+		return runSetURLMenu(cmd, cfg, files)
+	}
+	return nil
+}
+
+func printConfigStatus(ctx context.Context, out io.Writer, cfg *config.Config, files *localcfg.Scope) {
 	say(out, "server url: %s (global)\n", cfg.APIURL)
 	if files.URL != "" {
-		say(out, "            %s (override from %s)\n", files.URL, files.ProjectPath)
+		say(out, "            %s (override from %s — commands here use this)\n", files.URL, files.ProjectPath)
 	}
-	sayln(out)
+	if len(cfg.Sessions) == 0 {
+		sayln(out, "sessions:   none — run `shh login`")
+		return
+	}
+	urls := make([]string, 0, len(cfg.Sessions))
+	for u := range cfg.Sessions {
+		urls = append(urls, u)
+	}
+	sort.Strings(urls)
+	label := "sessions:  "
+	for _, u := range urls {
+		say(out, "%s %s — %s\n", label, u, sessionStatus(ctx, cfg, u))
+		label = "           "
+	}
+}
+
+// runSetURLMenu interactively sets the server URL: pick the scope (machine
+// vs project), then enter the URL.
+func runSetURLMenu(cmd *cobra.Command, cfg *config.Config, files *localcfg.Scope) error {
+	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
 
 	const (
 		scopeGlobal = iota
@@ -148,6 +225,7 @@ func runConfigMenu(cmd *cobra.Command) error {
 			huh.NewOption("this machine (global config)", scopeGlobal),
 			huh.NewOption(fmt.Sprintf("this project (%s, committed)", files.ProjectPath), scopeProject),
 		}
+		var err error
 		scope, err = selectIndex(cmd.Context(), in, out, "Where should the server URL be set?", opts)
 		if err != nil {
 			return err
@@ -167,15 +245,20 @@ func runConfigMenu(cmd *cobra.Command) error {
 	if err := runField(cmd.Context(), in, out, field); err != nil {
 		return err
 	}
-	serverURL, err = normalizeServerURL(serverURL)
+	serverURL, err := normalizeServerURL(serverURL)
 	if err != nil {
 		return err
 	}
 
 	if scope == scopeProject {
-		return setProjectURL(out, files, serverURL)
+		if err := setProjectURL(out, files, serverURL); err != nil {
+			return err
+		}
+	} else if err := setGlobalURL(out, cfg, serverURL); err != nil {
+		return err
 	}
-	return setGlobalURL(out, cfg, serverURL)
+	reportLoginStatus(cmd.Context(), out, cfg, serverURL)
+	return nil
 }
 
 func validateServerURL(s string) error {
