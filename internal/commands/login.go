@@ -59,7 +59,7 @@ your master password again.`,
 				return err
 			}
 
-			session, email, err := promptLogin(cmd.Context(), cmd, apiURL, email)
+			session, email, err := promptLogin(cmd.Context(), cmd.InOrStdin(), out, apiURL, email)
 			if err != nil {
 				return err
 			}

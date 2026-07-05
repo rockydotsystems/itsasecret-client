@@ -87,8 +87,16 @@ URL persists to the config file, so later commands need no flag.
   saver — losing it locks the session out). After ~30 idle minutes the next
   command prompts inline for the master password (`ensureSession` →
   `promptLogin`; email is remembered per server) and the full re-login also
-  refreshes org keys. Non-TTY contexts (direnv/scripts) never prompt — they
-  fail with "session expired — run any shh command in a terminal to unlock".
+  refreshes org keys. The prompt uses `promptIO`: stdin/stdout when both are
+  terminals, otherwise it opens `/dev/tty` directly (sudo-style) so captured
+  stdout (direnv, `eval "$(shh pull --shell)"`) stays clean and piped stdin
+  still gets a TUI prompt. Only headless runs (no controlling terminal) fail:
+  "session expired and no terminal is available…". A mid-command 401 (rolled
+  token lost before it was saved, revocation, server-side expiry) triggers
+  the same unlock prompt and retries the request once (`authedClient` →
+  `api.Client.WithReauth`); server-side, rotation is a compare-and-swap on
+  the current token hash so concurrent commands can't clobber each other's
+  tokens (the loser's request still succeeds via the grace window).
 - **Local storage security**: config.json never holds unwrapped org keys —
   only master-password-wrapped blobs (`wrappedOrgKeys`, from login's
   `masterWrappedOrgKeys`); legacy plaintext `orgKeys` are scrubbed on load.

@@ -93,5 +93,5 @@ func (s *scopeFlags) resolveClient(cmd *cobra.Command) (*resolvedScope, *api.Cli
 	if err != nil {
 		return nil, nil, err
 	}
-	return rs, clientFor(cfg, apiURL, session), nil
+	return rs, authedClient(cmd, cfg, apiURL, session), nil
 }

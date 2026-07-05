@@ -96,6 +96,41 @@ func TestExpiredSessionPromptsForMasterPassword(t *testing.T) {
 	}
 }
 
+func TestRejectedTokenPromptsAndRetries(t *testing.T) {
+	srv := startFakeServer(t)
+	setupConfig(t, srv.URL, false)
+	// The token looks fresh locally (future expiry) but the server rejects
+	// it — e.g. a rolled token that was never saved, past its grace window.
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.SetSession(srv.URL, config.StoredSession{
+		Token:     "clobbered-token",
+		Email:     "you@example.com",
+		ExpiresAt: time.Now().Add(20 * time.Minute),
+	})
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	linkedDir(t)
+
+	out, err := runCmd(t, "hunter2\n", "pull", "--shell")
+	if err != nil {
+		t.Fatalf("pull failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(out, "rejected by the server — enter your master password") {
+		t.Errorf("expected a rejected-session unlock prompt, got:\n%s", out)
+	}
+	if !strings.Contains(out, "export FOO='bar'") {
+		t.Errorf("expected the retried pull to succeed, got:\n%s", out)
+	}
+	s := storedSession(t, srv.URL)
+	if s.Token != "rotated-token" {
+		t.Errorf("stored token = %q, want the retried pull's rolled token", s.Token)
+	}
+}
+
 func TestExpiredSessionWrongPasswordFails(t *testing.T) {
 	srv := startFakeServer(t)
 	setupConfig(t, srv.URL, false)

@@ -65,7 +65,7 @@ resolves to.`,
 					sayln(out, err.Error())
 					return nil
 				}
-				client := clientFor(cfg, apiURL, session)
+				client := authedClient(cmd, cfg, apiURL, session)
 				return interactiveLink(cmd.Context(), client, cmd.InOrStdin(), out, cwd)
 			}
 

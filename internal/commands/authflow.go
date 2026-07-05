@@ -25,22 +25,26 @@ func ensureSession(ctx context.Context, cmd *cobra.Command, cfg *config.Config, 
 	if ok && stored.Token != "" && !stored.Expired() {
 		return auth.SessionFor(cfg, apiURL)
 	}
-
-	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
-	if !canPrompt(in) {
-		if ok && stored.Token != "" {
-			return nil, fmt.Errorf("session for %s expired — run any shh command in a terminal to unlock (or `shh login`)", apiURL)
-		}
-		return nil, fmt.Errorf("not logged in to %s — run `shh login`", apiURL)
-	}
-
+	reason := fmt.Sprintf("not logged in to %s yet", apiURL)
 	if ok && stored.Token != "" {
-		say(out, "Session for %s expired — enter your master password to unlock.\n", apiURL)
-	} else {
-		say(out, "Not logged in to %s yet.\n", apiURL)
+		reason = fmt.Sprintf("session for %s expired", apiURL)
 	}
-	email := stored.Email
-	session, email, err := promptLogin(ctx, cmd, apiURL, email)
+	return unlock(ctx, cmd, cfg, apiURL, reason)
+}
+
+// unlock prompts for the master password (on the controlling terminal when
+// stdio is redirected) and performs a full re-login, which also refreshes
+// org keys.
+func unlock(ctx context.Context, cmd *cobra.Command, cfg *config.Config, apiURL, reason string) (*auth.Session, error) {
+	in, out, cleanup, err := promptIO(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("%s and no terminal is available to ask for the master password — run any shh command in a terminal to unlock (or `shh login`)", reason)
+	}
+	defer cleanup()
+
+	say(out, "%s — enter your master password to unlock.\n", reason)
+	stored, _ := cfg.Session(apiURL)
+	session, email, err := promptLogin(ctx, in, out, apiURL, stored.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -51,11 +55,50 @@ func ensureSession(ctx context.Context, cmd *cobra.Command, cfg *config.Config, 
 	return session, nil
 }
 
+// authedClient is clientFor plus 401 recovery: when the server rejects the
+// session mid-command (rolled token lost before it was saved, revocation,
+// server-side expiry), the command prompts for the master password and the
+// failed request is retried once.
+func authedClient(cmd *cobra.Command, cfg *config.Config, apiURL string, session *auth.Session) *api.Client {
+	return clientFor(cfg, apiURL, session).WithReauth(func(ctx context.Context) (string, []byte, error) {
+		s, err := unlock(ctx, cmd, cfg, apiURL, fmt.Sprintf("session for %s was rejected by the server", apiURL))
+		if err != nil {
+			return "", nil, err
+		}
+		return s.Token, s.SessionKey, nil
+	})
+}
+
+// promptIO picks where the unlock prompt talks to the user. Stdout may be
+// captured (eval "$(shh pull --shell)", direnv) and stdin may be a pipe, so
+// whenever either isn't a terminal the prompt goes to the controlling
+// terminal (/dev/tty) directly, sudo-style. Only a genuinely headless run
+// (CI, no controlling terminal) errors. Non-file readers (tests) pass
+// through unchanged.
+func promptIO(cmd *cobra.Command) (io.Reader, io.Writer, func(), error) {
+	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
+	if _, ok := in.(*os.File); !ok {
+		return in, out, func() {}, nil
+	}
+	inTTY := isTerminalReader(in)
+	outTTY := false
+	if f, ok := out.(*os.File); ok && term.IsTerminal(f.Fd()) {
+		outTTY = true
+	}
+	if inTTY && outTTY {
+		return in, out, func() {}, nil
+	}
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("no terminal available: %w", err)
+	}
+	return tty, tty, func() { _ = tty.Close() }, nil
+}
+
 // promptLogin asks for credentials (email skipped when already known) and
 // performs the full login handshake, which also refreshes org keys — both
 // the server-side session map and the master-wrapped local copies.
-func promptLogin(ctx context.Context, cmd *cobra.Command, apiURL, email string) (*auth.Session, string, error) {
-	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
+func promptLogin(ctx context.Context, in io.Reader, out io.Writer, apiURL, email string) (*auth.Session, string, error) {
 	if email == "" {
 		field := huh.NewInput().Title("Email").Value(&email).Validate(func(s string) error {
 			if s == "" {
@@ -103,16 +146,6 @@ func promptLogin(ctx context.Context, cmd *cobra.Command, apiURL, email string) 
 func isTerminalReader(in io.Reader) bool {
 	f, ok := in.(*os.File)
 	return ok && term.IsTerminal(f.Fd())
-}
-
-// canPrompt reports whether interactive prompting is possible: a real
-// terminal, or a non-stdin reader (tests). Piped stdin (direnv, scripts)
-// can't prompt for a master password.
-func canPrompt(in io.Reader) bool {
-	if _, ok := in.(*os.File); !ok {
-		return true
-	}
-	return isTerminalReader(in)
 }
 
 // clientFor builds the API client every authenticated command must use: it

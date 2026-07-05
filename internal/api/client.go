@@ -20,6 +20,7 @@ type Client struct {
 	token      string
 	sessionKey []byte
 	onNewToken func(token string, expiresAt time.Time)
+	onReauth   func(ctx context.Context) (token string, sessionKey []byte, err error)
 	http       *http.Client
 }
 
@@ -45,6 +46,16 @@ func (c *Client) WithSessionKey(key []byte) *Client {
 // persisted or the next command is locked out once the grace window closes.
 func (c *Client) WithTokenSaver(fn func(token string, expiresAt time.Time)) *Client {
 	c.onNewToken = fn
+	return c
+}
+
+// WithReauth registers a recovery callback for rejected sessions: when the
+// server answers 401 (rolled token lost, session revoked or expired
+// server-side) the callback re-authenticates — typically by prompting for
+// the master password — and the request is retried once with the fresh
+// credentials.
+func (c *Client) WithReauth(fn func(ctx context.Context) (token string, sessionKey []byte, err error)) *Client {
+	c.onReauth = fn
 	return c
 }
 
@@ -411,6 +422,19 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (*http.R
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	// A rejected session (rolled token lost, revoked, expired server-side)
+	// gets one shot at recovery: re-authenticate and retry the request.
+	if resp.StatusCode == 401 && c.token != "" && c.onReauth != nil {
+		reauth := c.onReauth
+		c.onReauth = nil // one retry per client, no loops
+		_ = resp.Body.Close()
+		token, sessionKey, err := reauth(ctx)
+		if err != nil {
+			return nil, err
+		}
+		c.token, c.sessionKey = token, sessionKey
+		return c.do(ctx, method, path, body)
 	}
 	// Rolling sessions: successful responses carry a fresh token that must
 	// replace the one we sent.

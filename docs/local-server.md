@@ -98,9 +98,11 @@ directory (`$XDG_CONFIG_HOME/itsasecret/`, defaulting to
 Sessions roll: every successful command refreshes the token, valid for 30
 minutes. After ~30 idle minutes the next command asks for your master
 password inline (email is remembered) and re-unlocks — this also refreshes
-org keys, so newly joined orgs appear. Non-interactive contexts (direnv,
-scripts) can't prompt; they fail with a clear message until you run any shh
-command in a terminal.
+org keys, so newly joined orgs appear. The prompt opens the controlling
+terminal (`/dev/tty`) directly, sudo-style, so it also works when stdout is
+captured (direnv, `eval "$(shh pull --shell)"`) or stdin is a pipe. Only
+genuinely headless runs (CI, no controlling terminal) fail, with a clear
+message.
 
 The file is written with `0600` permissions. To use a throwaway config without
 touching your real one, override the config directory for the session:
@@ -253,7 +255,8 @@ rm ~/.config/itsasecret/config.json
 | `login failed: ... HTTP 401`              | Wrong credentials, or the account does not exist in the local DB.     |
 | `HTTP 403` (`Email not verified`)         | Verify the account first (link is printed to the server terminal).    |
 | `not logged in to <url> — run shh login`  | No session for that server; run `shh login` (after `shh config set url` for local). |
-| `session for <url> expired — run any shh command in a terminal` | Idle >30 min in a non-interactive context (e.g. direnv); any interactive shh command re-prompts your master password and unlocks. |
+| `session for <url> expired and no terminal is available…` | Idle >30 min in a headless context (CI, no controlling terminal). In a terminal — even under direnv — the master-password prompt appears on `/dev/tty` instead. |
+| `session for <url> was rejected by the server…` | The stored token is no longer valid (e.g. a rolled token was lost when a command was interrupted). The same master-password prompt unlocks and the command retries automatically. |
 | `environment "<name>" not found`          | The env name does not exist in that project; check `--env`.           |
 | `get secret: HTTP 404`                    | The key does not exist in that environment.                           |
 | Connection refused                        | The `www` dev server is not running on `http://localhost:3000`.       |
