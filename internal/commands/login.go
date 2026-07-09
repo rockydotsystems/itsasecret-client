@@ -45,6 +45,11 @@ your master password again.`,
 			} else {
 				say(out, "Logging in to %s\n", apiURL)
 			}
+			// The URL can come from a committed .shh.project - refuse to POST the
+			// master password over plaintext http to a non-loopback host.
+			if err := requireSecureURL(apiURL); err != nil {
+				return err
+			}
 
 			// Prefill the email from a previous session on this server.
 			stored, _ := cfg.Session(apiURL)

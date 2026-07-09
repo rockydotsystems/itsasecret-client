@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -19,6 +20,16 @@ import (
 // shellDialects are the --shell output formats. "auto" resolves at delivery
 // time via detectShellDialect.
 var shellDialects = []string{"posix", "fish", "nu", "pwsh"}
+
+// envKeyPattern matches a POSIX environment-variable / shell identifier. Values
+// are always quoted before emission, but variable NAMES are interpolated raw
+// into `export NAME=...` / `set -gx NAME ...` / `$env:NAME = ...`, and the
+// documented usage feeds that output straight to `eval`/`source`. A name is
+// therefore an unquotable injection point: a hostile or compromised server (the
+// CLI's threat model already assumes the URL can be attacker-controlled - see
+// requireSecureURL) returning a key like `X=1;curl evil` would otherwise run
+// arbitrary shell. Validate every key and fail closed rather than emit it.
+var envKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // shellQuote single-quotes a value so it survives `source`/`eval` and direnv's
 // dotenv parser intact, including spaces, $, and quotes.
@@ -164,6 +175,14 @@ func runPull(ctx context.Context, client *api.Client, project, env string, pc lo
 }
 
 func writeExports(w io.Writer, vars map[string]string, dialect string) error {
+	// Reject unsafe variable names before emitting anything - fail closed so a
+	// single hostile key can't slip arbitrary shell into an `eval`/`source`.
+	for k := range vars {
+		if !envKeyPattern.MatchString(k) {
+			return fmt.Errorf("refusing to emit variable with unsafe name %q", k)
+		}
+	}
+
 	if dialect == "nu" {
 		// Nushell has no eval; the injection path is structured data:
 		//   load-env (shh pull --shell | from json)

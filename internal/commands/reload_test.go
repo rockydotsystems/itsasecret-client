@@ -214,15 +214,38 @@ func TestWriteExportsDialects(t *testing.T) {
 	}
 }
 
+// A server-controlled variable name that isn't a plain shell identifier must
+// never reach `eval`/`source`. writeExports has to fail closed for every
+// eval-fed dialect rather than emit an injectable line.
+func TestWriteExportsRejectsUnsafeKeys(t *testing.T) {
+	unsafe := []string{
+		"X=1;curl evil", // command chaining under eval
+		"FOO BAR",       // space
+		"1FOO",          // leading digit
+		"FOO-BAR",       // dash
+		"$(id)",         // substitution
+		"",              // empty
+	}
+	for _, key := range unsafe {
+		vars := map[string]string{key: "value"}
+		for _, dialect := range []string{"posix", "fish", "pwsh", "nu"} {
+			var buf strings.Builder
+			if err := writeExports(&buf, vars, dialect); err == nil {
+				t.Errorf("dialect %s accepted unsafe key %q, emitted:\n%s", dialect, key, buf.String())
+			}
+		}
+	}
+}
+
 func TestDetectShellDialect(t *testing.T) {
 	t.Setenv("DIRENV_IN_ENVRC", "")
 	for shellPath, want := range map[string]string{
-		"/bin/bash":                       "posix",
-		"/usr/bin/zsh":                    "posix",
-		"/usr/bin/fish":                   "fish",
-		"/run/current-system/sw/bin/nu":   "nu",
-		"/usr/local/bin/pwsh":             "pwsh",
-		"":                                "posix",
+		"/bin/bash":                     "posix",
+		"/usr/bin/zsh":                  "posix",
+		"/usr/bin/fish":                 "fish",
+		"/run/current-system/sw/bin/nu": "nu",
+		"/usr/local/bin/pwsh":           "pwsh",
+		"":                              "posix",
 	} {
 		t.Setenv("SHELL", shellPath)
 		if got := detectShellDialect(); got != want {

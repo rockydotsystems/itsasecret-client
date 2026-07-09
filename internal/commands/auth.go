@@ -48,6 +48,12 @@ directory tree has one) or the machine-global config, same as ` + "`shh login`" 
 				apiURL = files.URL
 				say(out, "Authenticating to %s (from %s)\n", apiURL, files.ProjectPath)
 			}
+			// The URL can come from a committed .shh.project - refuse to send the
+			// token and transport session key over plaintext http to a non-loopback
+			// host.
+			if err := requireSecureURL(apiURL); err != nil {
+				return err
+			}
 
 			bearer, sessionKey, err := auth.ParseAccessToken(args[0])
 			if err != nil {

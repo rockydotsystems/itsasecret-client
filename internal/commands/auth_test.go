@@ -134,6 +134,32 @@ func TestAuthRejectedByServer(t *testing.T) {
 	}
 }
 
+// A committed .shh.project pointing at a plaintext-http non-loopback server
+// must not cause the token + transport key to be sent in cleartext. auth has
+// to refuse before contacting the server, and persist nothing.
+func TestAuthRefusesInsecureProjectURL(t *testing.T) {
+	setupConfig(t, "https://global.example.invalid", false)
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".shh.project"), []byte("project = proj1\nurl = http://evil.example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	_, err := runCmd(t, "", "auth", fakeToken)
+	if err == nil || !strings.Contains(err.Error(), "insecure http") {
+		t.Fatalf("want insecure-URL refusal, got %v", err)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.Session("http://evil.example.com"); ok {
+		t.Error("session persisted for an insecure URL")
+	}
+}
+
 // The auth command honors a url override from .shh.project, like login does.
 func TestAuthHonorsProjectURLOverride(t *testing.T) {
 	srv := startTokenServer(t, time.Now().Add(time.Hour))

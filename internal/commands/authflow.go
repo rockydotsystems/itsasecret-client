@@ -135,6 +135,14 @@ func promptLogin(ctx context.Context, in io.Reader, out io.Writer, apiURL, email
 	if email == "" || password == "" {
 		return nil, "", fmt.Errorf("not logged in to %s - no credentials entered (run `shh login`)", apiURL)
 	}
+	// Last line of defense before the master password leaves the machine: the
+	// apiURL may come from a committed .shh.project `url =` line, so never POST
+	// credentials over plaintext http to a non-loopback host. This covers every
+	// path that reaches a login (shh login, and the inline unlock prompt used by
+	// link and by authedClient's 401 re-auth).
+	if err := requireSecureURL(apiURL); err != nil {
+		return nil, "", err
+	}
 	session, err := auth.Login(ctx, api.NewClient(apiURL), email, password)
 	if err != nil {
 		return nil, "", fmt.Errorf("login failed: %w", err)
