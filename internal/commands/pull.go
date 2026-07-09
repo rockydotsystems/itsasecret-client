@@ -139,8 +139,16 @@ func runPull(ctx context.Context, client *api.Client, project, env string, pc lo
 		return writeExports(out, vars, dialect)
 	}
 
-	f, err := os.Create(pc.Out)
+	// 0600: the output holds decrypted secrets. os.Create would use 0666&umask
+	// (typically 0644, world-readable). Truncate on open to match os.Create's
+	// overwrite semantics. If the file already exists with looser perms, tighten
+	// them - OpenFile's mode only applies on creation.
+	f, err := os.OpenFile(pc.Out, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
 		return err
 	}
 	// The .env file stays POSIX - it's meant for `source` and direnv.

@@ -2,6 +2,8 @@ package commands
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 
 	"itsasecret.dev/cli/internal/api"
@@ -74,6 +76,33 @@ func (rs *resolvedScope) apiURL(cfg *config.Config) string {
 	return cfg.APIURL
 }
 
+// requireSecureURL rejects a plaintext-HTTP server URL for any non-loopback
+// host. The effective URL can come from a committed .shh.project `url =` line
+// (localcfg.parseProjectFile does no scheme check), so a malicious repo could
+// otherwise point the CLI at http://evil and harvest the master password and
+// session key in cleartext on the next login/pull. Loopback stays allowed for
+// local development and self-hosting over an SSH tunnel.
+func requireSecureURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid server URL %q: %w", raw, err)
+	}
+	if u.Scheme == "https" {
+		return nil
+	}
+	if u.Scheme == "http" {
+		host := u.Hostname()
+		if host == "localhost" {
+			return nil
+		}
+		if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+			return nil
+		}
+		return fmt.Errorf("refusing to use insecure http:// server URL %q for a non-loopback host - use https", raw)
+	}
+	return fmt.Errorf("server URL %q must use https", raw)
+}
+
 // resolveClient resolves the scope and the effective server URL, ensures a
 // live session for it (prompting for the master password when the rolling
 // session has idled out), and returns a ready API client that persists
@@ -89,6 +118,9 @@ func (s *scopeFlags) resolveClient(cmd *cobra.Command) (*resolvedScope, *api.Cli
 		return nil, nil, err
 	}
 	apiURL := rs.apiURL(cfg)
+	if err := requireSecureURL(apiURL); err != nil {
+		return nil, nil, err
+	}
 	session, err := ensureSession(cmd.Context(), cmd, cfg, apiURL)
 	if err != nil {
 		return nil, nil, err
