@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -31,10 +32,16 @@ func NewRootCmd() *cobra.Command {
 	return cmd
 }
 
+var keyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
 func splitKeyValue(arg string) (key, value string, err error) {
 	idx := strings.Index(arg, "=")
 	if idx <= 0 {
 		return "", "", fmt.Errorf("expected KEY=VALUE, got %q", arg)
 	}
-	return arg[:idx], arg[idx+1:], nil
+	key = arg[:idx]
+	if !keyPattern.MatchString(key) {
+		return "", "", fmt.Errorf("invalid key %q: must be a valid identifier (letters, digits, underscore; not starting with a digit)", key)
+	}
+	return key, arg[idx+1:], nil
 }

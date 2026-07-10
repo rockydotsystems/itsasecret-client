@@ -10,11 +10,24 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"time"
 
 	"itsasecret.dev/cli/internal/crypto"
 )
+
+// keyPattern validates env-var/secret key names before they're interpolated
+// into URL paths. Without this, a key containing "/" or ".." could inject
+// extra path segments (e.g. "shh secret get ../foo" hits a different route).
+var keyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func validateKey(key string) error {
+	if !keyPattern.MatchString(key) {
+		return fmt.Errorf("invalid key %q: must match %s", key, keyPattern.String())
+	}
+	return nil
+}
 
 type Client struct {
 	baseURL    string
@@ -177,7 +190,7 @@ type PullResponse struct {
 }
 
 func (c *Client) Pull(ctx context.Context, projectID, envName string) (map[string]string, error) {
-	path := fmt.Sprintf("/api/projects/%s/envs/%s/pull", projectID, envName)
+	path := fmt.Sprintf("/api/projects/%s/envs/%s/pull", url.PathEscape(projectID), url.PathEscape(envName))
 	resp, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
@@ -238,7 +251,7 @@ func (c *Client) ListOrgs(ctx context.Context) ([]Org, error) {
 // ListProjects returns the projects in an org.
 func (c *Client) ListProjects(ctx context.Context, orgID string) ([]Project, error) {
 	var projects []Project
-	path := fmt.Sprintf("/api/orgs/%s/projects", orgID)
+	path := fmt.Sprintf("/api/orgs/%s/projects", url.PathEscape(orgID))
 	if err := c.getJSON(ctx, path, "list projects", &projects); err != nil {
 		return nil, err
 	}
@@ -248,7 +261,7 @@ func (c *Client) ListProjects(ctx context.Context, orgID string) ([]Project, err
 // ListEnvs returns the environments in a project.
 func (c *Client) ListEnvs(ctx context.Context, projectID string) ([]Environment, error) {
 	var envs []Environment
-	path := fmt.Sprintf("/api/projects/%s/envs", projectID)
+	path := fmt.Sprintf("/api/projects/%s/envs", url.PathEscape(projectID))
 	if err := c.getJSON(ctx, path, "list envs", &envs); err != nil {
 		return nil, err
 	}
@@ -278,7 +291,7 @@ func (c *Client) ListSecrets(ctx context.Context, projectID, envName string) ([]
 	if err != nil {
 		return nil, err
 	}
-	path := fmt.Sprintf("/api/envs/%s/secrets", envID)
+	path := fmt.Sprintf("/api/envs/%s/secrets", url.PathEscape(envID))
 	resp, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
@@ -302,6 +315,9 @@ func (c *Client) ListSecrets(ctx context.Context, projectID, envName string) ([]
 }
 
 func (c *Client) SetSecret(ctx context.Context, projectID, envName, key, value string) error {
+	if err := validateKey(key); err != nil {
+		return err
+	}
 	if len(c.sessionKey) == 0 {
 		return fmt.Errorf("no session key - cannot encrypt secret")
 	}
@@ -313,24 +329,28 @@ func (c *Client) SetSecret(ctx context.Context, projectID, envName, key, value s
 	if err != nil {
 		return err
 	}
-	// cipher defaults to 'session' server-side: the server decrypts with the
-	// transport session key and re-encrypts under the org key.
-	path := fmt.Sprintf("/api/envs/%s/secrets/%s", envID, key)
+	path := fmt.Sprintf("/api/envs/%s/secrets/%s", url.PathEscape(envID), url.PathEscape(key))
 	body := map[string]string{"encryptedValue": encrypted}
 	return c.doNoBody(ctx, "PUT", path, body)
 }
 
 func (c *Client) SetVar(ctx context.Context, projectID, envName, key, value string) error {
+	if err := validateKey(key); err != nil {
+		return err
+	}
 	envID, err := c.resolveEnvID(ctx, projectID, envName)
 	if err != nil {
 		return err
 	}
-	path := fmt.Sprintf("/api/envs/%s/vars/%s", envID, key)
+	path := fmt.Sprintf("/api/envs/%s/vars/%s", url.PathEscape(envID), url.PathEscape(key))
 	body := map[string]string{"value": value}
 	return c.doNoBody(ctx, "PUT", path, body)
 }
 
 func (c *Client) GetSecret(ctx context.Context, projectID, envName, key string) (string, error) {
+	if err := validateKey(key); err != nil {
+		return "", err
+	}
 	if len(c.sessionKey) == 0 {
 		return "", fmt.Errorf("no session key - cannot decrypt secret")
 	}
@@ -338,7 +358,7 @@ func (c *Client) GetSecret(ctx context.Context, projectID, envName, key string) 
 	if err != nil {
 		return "", err
 	}
-	path := fmt.Sprintf("/api/envs/%s/secrets/%s", envID, key)
+	path := fmt.Sprintf("/api/envs/%s/secrets/%s", url.PathEscape(envID), url.PathEscape(key))
 	resp, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
 		return "", err
@@ -368,7 +388,7 @@ func (c *Client) GetVar(ctx context.Context, projectID, envName, key string) (st
 	if err != nil {
 		return "", err
 	}
-	path := fmt.Sprintf("/api/envs/%s/vars", envID)
+	path := fmt.Sprintf("/api/envs/%s/vars", url.PathEscape(envID))
 	resp, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
 		return "", err
@@ -397,7 +417,7 @@ func (c *Client) ForkEnv(ctx context.Context, projectID, envName, newName string
 	if err != nil {
 		return err
 	}
-	path := fmt.Sprintf("/api/projects/%s/envs/%s/fork", projectID, envID)
+	path := fmt.Sprintf("/api/projects/%s/envs/%s/fork", url.PathEscape(projectID), url.PathEscape(envID))
 	body := map[string]string{"name": newName}
 	resp, err := c.do(ctx, "POST", path, body)
 	if err != nil {
