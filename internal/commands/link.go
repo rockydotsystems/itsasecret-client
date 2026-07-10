@@ -58,11 +58,14 @@ resolves to.`,
 				if err != nil {
 					return err
 				}
-				apiURL := cfg.APIURL
-				if files.URL != "" {
-					apiURL = files.URL
-				}
-				session, err := ensureSession(cmd.Context(), cmd, cfg, apiURL)
+			apiURL := cfg.APIURL
+			if files.URL != "" {
+				apiURL = files.URL
+			}
+			if err := requireSecureURL(apiURL); err != nil {
+				return err
+			}
+			session, err := ensureSession(cmd.Context(), cmd, cfg, apiURL)
 				if err != nil {
 					// Can't authenticate here (e.g. no terminal) - show the
 					// current state instead.

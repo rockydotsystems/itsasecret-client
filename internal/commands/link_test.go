@@ -275,7 +275,7 @@ func TestLinkInteractiveOrgWithoutProjectsErrors(t *testing.T) {
 }
 
 func TestLinkNotLoggedInShowsStatus(t *testing.T) {
-	setupConfig(t, "http://unused.invalid", false)
+	setupConfig(t, "https://unused.invalid", false)
 	dir := t.TempDir()
 	t.Chdir(dir)
 
