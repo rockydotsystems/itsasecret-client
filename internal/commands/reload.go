@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"itsasecret.dev/cli/internal/localcfg"
 
@@ -31,13 +32,28 @@ the output with: eval "$(shh reload)"`,
 			if rs.files.ProjectPath == "" || pc == nil {
 				return fmt.Errorf("nothing to reload: no pull mode recorded in %s - run `shh pull` (or `shh pull --shell`) once first", localcfg.ProjectFile)
 			}
-			delivery := *pc
-			if delivery.Mode == localcfg.PullModeFile && !filepath.IsAbs(delivery.Out) {
-				delivery.Out = filepath.Join(filepath.Dir(rs.files.ProjectPath), delivery.Out)
+		delivery := *pc
+		if delivery.Mode == localcfg.PullModeFile && !filepath.IsAbs(delivery.Out) {
+			delivery.Out = filepath.Join(filepath.Dir(rs.files.ProjectPath), delivery.Out)
+			markerDir := filepath.Dir(rs.files.ProjectPath)
+			absOut, err := filepath.Abs(delivery.Out)
+			if err != nil {
+				return fmt.Errorf("invalid output path %q: %w", delivery.Out, err)
 			}
+			if !isWithinDir(absOut, markerDir) {
+				return fmt.Errorf("refusing to write secrets outside the project directory: recorded path %q resolves to %s", pc.Out, absOut)
+			}
+		}
 			return runPull(cmd.Context(), client, rs.project, rs.env, delivery, cmd.OutOrStdout())
 		},
 	}
 	addScopeFlags(cmd, &scope)
 	return cmd
+}
+
+func isWithinDir(path, dir string) bool {
+	if path == dir {
+		return true
+	}
+	return strings.HasPrefix(path, dir+string(filepath.Separator))
 }
