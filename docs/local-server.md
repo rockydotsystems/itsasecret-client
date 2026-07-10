@@ -84,6 +84,14 @@ A repo can also pin its server by committing a `url =` line in
 "this project" in the bare `shh config` menu). The project override beats the
 global config, and `shh config get url` shows which one is in effect.
 
+> **Security note:** a `url =` line is meant to be committed, so anyone who
+> clones the repo - including their `shh login` and `shh pull` - will send
+> credentials (master password, session keys) to that server. Only commit a
+> `url =` for a server you trust. Running `shh` inside an untrusted checkout
+> that carries a `url =` line pointing at an attacker's host will leak your
+> master password to that host. When in doubt, check `shh config get url`
+> before logging in.
+
 ### Configuration file
 
 `shh config` and `shh login` write `config.json` under the user config

@@ -31,6 +31,13 @@ Writes ` + localcfg.ProjectFile + ` (the project ID - commit it) and ` + localcf
 (the environment name - kept local, added to .gitignore). Commands look for
 both files in the current directory and its parents.
 
+` + localcfg.ProjectFile + ` can also carry a url = line that overrides the
+machine-global server URL (set with ` + "`shh config set url <url> --project`" + `).
+Because this file is meant to be committed, anyone who clones the repo runs
+` + "`shh`" + ` against that URL. Only point it at a server you trust with your
+master password and session keys - a malicious url = line in an untrusted
+checkout could redirect your credentials to an attacker-controlled host.
+
 With no flags: when logged in, links interactively (pick a project and
 environment from your orgs); otherwise shows what the current directory
 resolves to.`,
