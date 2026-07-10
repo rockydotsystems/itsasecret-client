@@ -132,6 +132,9 @@ func sessionStatus(ctx context.Context, cfg *config.Config, serverURL string) st
 	if stored.Expired() {
 		return "session idle-expired - the next command asks for your master password"
 	}
+	if err := requireSecureURL(serverURL); err != nil {
+		return fmt.Sprintf("insecure server URL - session not verified (%v)", err)
+	}
 	session, err := auth.SessionFor(cfg, serverURL)
 	if err != nil {
 		return fmt.Sprintf("stored session unreadable (%v)", err)
