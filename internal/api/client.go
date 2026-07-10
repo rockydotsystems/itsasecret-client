@@ -17,6 +17,8 @@ import (
 	"itsasecret.dev/cli/internal/crypto"
 )
 
+const maxResponseSize = 100 << 20
+
 // keyPattern validates env-var/secret key names before they're interpolated
 // into URL paths. Without this, a key containing "/" or ".." could inject
 // extra path segments (e.g. "shh secret get ../foo" hits a different route).
@@ -130,7 +132,7 @@ func (c *Client) MeDetails(ctx context.Context) (*MeDetails, error) {
 			ExpiresAt time.Time `json:"expiresAt"`
 		} `json:"session"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&out); err != nil {
 		return nil, err
 	}
 	return &MeDetails{
@@ -175,7 +177,7 @@ func (c *Client) Login(ctx context.Context, email, password, clientPubKey string
 		return nil, fmt.Errorf("login: HTTP %d", resp.StatusCode)
 	}
 	var out LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -200,7 +202,7 @@ func (c *Client) Pull(ctx context.Context, projectID, envName string) (map[strin
 		return nil, fmt.Errorf("pull: HTTP %d", resp.StatusCode)
 	}
 	var out PullResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&out); err != nil {
 		return nil, err
 	}
 	result := make(map[string]string, len(out.Vars)+len(out.Secrets))
@@ -303,7 +305,7 @@ func (c *Client) ListSecrets(ctx context.Context, projectID, envName string) ([]
 	var rows []struct {
 		Key string `json:"key"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&rows); err != nil {
 		return nil, err
 	}
 	keys := make([]string, 0, len(rows))
@@ -371,7 +373,7 @@ func (c *Client) GetSecret(ctx context.Context, projectID, envName, key string) 
 		Key            string `json:"key"`
 		EncryptedValue string `json:"encryptedValue"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&out); err != nil {
 		return "", err
 	}
 	plaintext, err := crypto.DecryptString(c.sessionKey, out.EncryptedValue)
@@ -401,7 +403,7 @@ func (c *Client) GetVar(ctx context.Context, projectID, envName, key string) (st
 		Key   string `json:"key"`
 		Value string `json:"value"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&vars); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(&vars); err != nil {
 		return "", err
 	}
 	for _, v := range vars {
@@ -441,7 +443,7 @@ func (c *Client) getJSON(ctx context.Context, path, what string, out any) error 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("%s: HTTP %d", what, resp.StatusCode)
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	return json.NewDecoder(io.LimitReader(resp.Body, maxResponseSize)).Decode(out)
 }
 
 func (c *Client) doNoBody(ctx context.Context, method, path string, body any) error {
