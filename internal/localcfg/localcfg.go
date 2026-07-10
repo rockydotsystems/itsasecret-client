@@ -226,9 +226,23 @@ func readValue(path string) (string, error) {
 	return v, nil
 }
 
+// validateMarkerValue rejects values containing newlines or carriage
+// returns. Marker files are line-oriented key=value stores, so a value with
+// an embedded newline would inject extra lines on the next parse (e.g. a
+// project ID like "evil\nurl = http://attacker" would add a url line).
+func validateMarkerValue(field, value string) error {
+	if strings.ContainsAny(value, "\n\r") {
+		return fmt.Errorf("invalid %s %q: must not contain newlines", field, value)
+	}
+	return nil
+}
+
 // WriteProject writes .shh.project in dir and returns its path, preserving
 // the other recorded settings (url, pull) if the file already exists.
 func WriteProject(dir, project string) (string, error) {
+	if err := validateMarkerValue("project", project); err != nil {
+		return "", err
+	}
 	path := filepath.Join(dir, ProjectFile)
 	pc, err := parseProjectFile(path)
 	if err != nil {
@@ -260,6 +274,9 @@ func SavePull(path string, pull PullConfig) error {
 // SaveURL records (or, with an empty value, removes) the server URL override
 // in an existing .shh.project file.
 func SaveURL(path, url string) error {
+	if err := validateMarkerValue("url", url); err != nil {
+		return err
+	}
 	pc, err := parseProjectFile(path)
 	if err != nil {
 		return err
@@ -273,7 +290,13 @@ func SaveURL(path, url string) error {
 
 // WriteEnv writes .shh.env in dir and returns its path.
 func WriteEnv(dir, env string) (string, error) {
+	if err := validateMarkerValue("env", env); err != nil {
+		return "", err
+	}
 	path := filepath.Join(dir, EnvFile)
+	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("refusing to write %s through a symlink", path)
+	}
 	if err := os.WriteFile(path, []byte(env+"\n"), 0o600); err != nil {
 		return "", err
 	}
