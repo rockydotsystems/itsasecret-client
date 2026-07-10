@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"os"
 	"sort"
@@ -275,6 +276,15 @@ func validateServerURL(s string) error {
 	u, err := url.Parse(strings.TrimSpace(s))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("enter a full URL like https://itsasecret.dev")
+	}
+	if u.User != nil {
+		return fmt.Errorf("server URL must not contain userinfo (user:pass@)")
+	}
+	if u.Scheme == "http" {
+		host := u.Hostname()
+		if host != "localhost" && (net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback()) {
+			return fmt.Errorf("insecure http:// URL for non-loopback host %q - use https", host)
+		}
 	}
 	return nil
 }
