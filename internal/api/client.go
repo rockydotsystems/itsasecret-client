@@ -386,6 +386,9 @@ func (c *Client) GetSecret(ctx context.Context, projectID, envName, key string) 
 // GetVar reads a single var. There is no single-var GET route (vars are
 // plaintext), so it lists the env's vars and picks the key.
 func (c *Client) GetVar(ctx context.Context, projectID, envName, key string) (string, error) {
+	if err := validateKey(key); err != nil {
+		return "", err
+	}
 	envID, err := c.resolveEnvID(ctx, projectID, envName)
 	if err != nil {
 		return "", err
