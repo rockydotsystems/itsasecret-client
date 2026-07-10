@@ -93,6 +93,9 @@ func Load() (*Config, error) {
 		}
 		return nil, err
 	}
+	if fi, err := os.Stat(p); err == nil && fi.Mode().Perm() != 0o600 {
+		_ = os.Chmod(p, 0o600)
+	}
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
