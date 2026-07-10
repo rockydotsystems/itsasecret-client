@@ -170,8 +170,8 @@ func clientFor(cfg *config.Config, apiURL string, session *auth.Session) *api.Cl
 				stored.ExpiresAt = expiresAt
 			}
 			cfg.SetSession(apiURL, stored)
-			// Best-effort: if the write fails the worst case is an early
-			// re-prompt for the master password.
-			_ = cfg.Save()
+			if err := cfg.Save(); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not save rotated session token: %v\n", err)
+			}
 		})
 }
