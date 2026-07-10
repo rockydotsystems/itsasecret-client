@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"time"
 
@@ -27,7 +28,20 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
-		http:    http.DefaultClient,
+		http: &http.Client{
+			Timeout: 60 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				orig, err := url.Parse(baseURL)
+				if err == nil && (req.URL.Host != orig.Host || req.URL.Scheme != orig.Scheme) {
+					req.Header.Del("Authorization")
+					req.Header.Del("X-Session-Key")
+				}
+				if len(via) >= 10 {
+					return fmt.Errorf("stopped after 10 redirects")
+				}
+				return nil
+			},
+		},
 	}
 }
 
