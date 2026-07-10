@@ -52,19 +52,25 @@ your master password again.`,
 			}
 
 			// Prefill the email from a previous session on this server.
-			stored, _ := cfg.Session(apiURL)
-			email := stored.Email
-			field := huh.NewInput().Title("Email").Value(&email).Validate(func(s string) error {
-				if s == "" {
-					return fmt.Errorf("enter the account email")
-				}
-				return nil
-			})
-			if err := runField(cmd.Context(), cmd.InOrStdin(), out, field); err != nil {
-				return err
-			}
+		stored, _ := cfg.Session(apiURL)
+		email := stored.Email
+		pIn, pOut, pCleanup, err := promptIO(cmd)
+		if err != nil {
+			return fmt.Errorf("no terminal available to prompt for credentials: %w", err)
+		}
+		defer pCleanup()
 
-			session, email, err := promptLogin(cmd.Context(), cmd.InOrStdin(), out, apiURL, email)
+		field := huh.NewInput().Title("Email").Value(&email).Validate(func(s string) error {
+			if s == "" {
+				return fmt.Errorf("enter the account email")
+			}
+			return nil
+		})
+		if err := runField(cmd.Context(), pIn, pOut, field); err != nil {
+			return err
+		}
+
+		session, email, err := promptLogin(cmd.Context(), pIn, pOut, apiURL, email)
 			if err != nil {
 				return err
 			}
