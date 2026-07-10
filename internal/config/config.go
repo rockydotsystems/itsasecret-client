@@ -138,6 +138,9 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
+	if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to write config through a symlink at %s", p)
+	}
 	if err := os.WriteFile(p, data, 0o600); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}

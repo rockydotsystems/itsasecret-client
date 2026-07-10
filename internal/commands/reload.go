@@ -35,14 +35,26 @@ the output with: eval "$(shh reload)"`,
 		delivery := *pc
 		if delivery.Mode == localcfg.PullModeFile && !filepath.IsAbs(delivery.Out) {
 			delivery.Out = filepath.Join(filepath.Dir(rs.files.ProjectPath), delivery.Out)
-			markerDir := filepath.Dir(rs.files.ProjectPath)
+			markerDir, err := filepath.EvalSymlinks(filepath.Dir(rs.files.ProjectPath))
+			if err != nil {
+				return fmt.Errorf("invalid project directory: %w", err)
+			}
 			absOut, err := filepath.Abs(delivery.Out)
 			if err != nil {
 				return fmt.Errorf("invalid output path %q: %w", delivery.Out, err)
 			}
-			if !isWithinDir(absOut, markerDir) {
-				return fmt.Errorf("refusing to write secrets outside the project directory: recorded path %q resolves to %s", pc.Out, absOut)
+			resolvedOut, err := filepath.EvalSymlinks(absOut)
+			if err != nil {
+				parent, perr := filepath.EvalSymlinks(filepath.Dir(absOut))
+				if perr != nil {
+					return fmt.Errorf("invalid output path %q: %w", delivery.Out, perr)
+				}
+				resolvedOut = filepath.Join(parent, filepath.Base(absOut))
 			}
+			if !isWithinDir(resolvedOut, markerDir) {
+				return fmt.Errorf("refusing to write secrets outside the project directory: recorded path %q resolves to %s", pc.Out, resolvedOut)
+			}
+			delivery.Out = resolvedOut
 		}
 			return runPull(cmd.Context(), client, rs.project, rs.env, delivery, cmd.OutOrStdout())
 		},
