@@ -215,8 +215,9 @@ func TestWriteExportsDialects(t *testing.T) {
 }
 
 // A server-controlled variable name that isn't a plain shell identifier must
-// never reach `eval`/`source`. writeExports has to fail closed for every
-// eval-fed dialect rather than emit an injectable line.
+// never reach `eval`/`source`. writeExports fails closed for every eval-fed
+// dialect. Nushell is exempt: load-env consumes structured JSON, so a name
+// can't break out into a command there - it must still emit.
 func TestWriteExportsRejectsUnsafeKeys(t *testing.T) {
 	unsafe := []string{
 		"X=1;curl evil", // command chaining under eval
@@ -228,11 +229,16 @@ func TestWriteExportsRejectsUnsafeKeys(t *testing.T) {
 	}
 	for _, key := range unsafe {
 		vars := map[string]string{key: "value"}
-		for _, dialect := range []string{"posix", "fish", "pwsh", "nu"} {
+		for _, dialect := range []string{"posix", "fish", "pwsh"} {
 			var buf strings.Builder
 			if err := writeExports(&buf, vars, dialect); err == nil {
 				t.Errorf("dialect %s accepted unsafe key %q, emitted:\n%s", dialect, key, buf.String())
 			}
+		}
+		// Nushell has no eval - the same key must be emitted, not rejected.
+		var nuBuf strings.Builder
+		if err := writeExports(&nuBuf, vars, "nu"); err != nil {
+			t.Errorf("nu rejected key %q, but structured output has no injection risk: %v", key, err)
 		}
 	}
 }

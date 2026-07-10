@@ -175,23 +175,28 @@ func runPull(ctx context.Context, client *api.Client, project, env string, pc lo
 }
 
 func writeExports(w io.Writer, vars map[string]string, dialect string) error {
-	// Reject unsafe variable names before emitting anything - fail closed so a
-	// single hostile key can't slip arbitrary shell into an `eval`/`source`.
-	for k := range vars {
-		if !envKeyPattern.MatchString(k) {
-			return fmt.Errorf("refusing to emit variable with unsafe name %q", k)
-		}
-	}
-
 	if dialect == "nu" {
-		// Nushell has no eval; the injection path is structured data:
-		//   load-env (shh pull --shell | from json)
+		// Nushell has no eval: `load-env (shh pull --shell | from json)` consumes
+		// structured JSON, so a variable name can never break out into a command.
+		// Key validation below is a defense against `eval`/`source` injection and
+		// simply doesn't apply here - emit whatever names the server returned.
 		data, err := json.Marshal(vars)
 		if err != nil {
 			return err
 		}
 		_, err = fmt.Fprintf(w, "%s\n", data)
 		return err
+	}
+
+	// posix/fish/pwsh output is fed to eval/source/dot-source, where the variable
+	// NAME is interpolated unquoted (values are quoted, names can't be). Reject
+	// any name that isn't a plain shell identifier and fail closed, so a single
+	// hostile key can't slip arbitrary shell in. Legitimately-created variables
+	// always pass - the server enforces this same pattern on write.
+	for k := range vars {
+		if !envKeyPattern.MatchString(k) {
+			return fmt.Errorf("refusing to emit variable with unsafe name %q", k)
+		}
 	}
 
 	keys := make([]string, 0, len(vars))
