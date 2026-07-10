@@ -195,10 +195,16 @@ func parsePullValue(path, value string) (*PullConfig, error) {
 
 // saveProjectFile writes the config back, skipping the write when the file
 // already says exactly this (so repeated saves don't churn a tracked file).
+// Refuses to write through a symlink, matching the config-file hardening in
+// config.Save: a malicious .shh.project symlink could redirect project/pull
+// settings to an unintended location.
 func saveProjectFile(path string, pc *projectConfig) error {
 	content := pc.format()
 	if current, err := os.ReadFile(path); err == nil && string(current) == content {
 		return nil
+	}
+	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to write %s through a symlink", path)
 	}
 	return os.WriteFile(path, []byte(content), 0o644)
 }
