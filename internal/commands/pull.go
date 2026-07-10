@@ -66,7 +66,10 @@ func newPullCmd() *cobra.Command {
   load-env (shh pull --shell | from json)        # nushell
 
 Bare --shell picks the dialect from $SHELL (POSIX inside direnv, where .envrc
-is always bash); force one with --shell=posix|fish|nu|pwsh.`,
+is always bash); force one with --shell=posix|fish|nu|pwsh.
+
+To skip the manual eval, enable the shell integration once (see
+` + "`shh shell-init`" + `) and just run ` + "`shh load`" + `.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			pc := localcfg.PullConfig{Mode: localcfg.PullModeFile, Out: outFile}
 			if pc.Out == "" {
