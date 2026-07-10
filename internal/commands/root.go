@@ -34,6 +34,13 @@ func NewRootCmd() *cobra.Command {
 
 var keyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+func validateKey(key string) error {
+	if !keyPattern.MatchString(key) {
+		return fmt.Errorf("invalid key %q: must be a valid identifier (letters, digits, underscore; not starting with a digit)", key)
+	}
+	return nil
+}
+
 func splitKeyValue(arg string) (key, value string, err error) {
 	idx := strings.Index(arg, "=")
 	if idx <= 0 {

@@ -51,6 +51,9 @@ func newVarGetCmd() *cobra.Command {
 		Short: "Get a single env var value",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateKey(args[0]); err != nil {
+				return err
+			}
 			rs, client, err := scope.resolveClient(cmd)
 			if err != nil {
 				return err
