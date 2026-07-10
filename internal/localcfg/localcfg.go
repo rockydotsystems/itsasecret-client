@@ -206,7 +206,7 @@ func saveProjectFile(path string, pc *projectConfig) error {
 	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("refusing to write %s through a symlink", path)
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
+	return os.WriteFile(path, []byte(content), 0o600)
 }
 
 // readValue returns the trimmed content of a single-value marker file, or ""
@@ -274,7 +274,7 @@ func SaveURL(path, url string) error {
 // WriteEnv writes .shh.env in dir and returns its path.
 func WriteEnv(dir, env string) (string, error) {
 	path := filepath.Join(dir, EnvFile)
-	if err := os.WriteFile(path, []byte(env+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(env+"\n"), 0o600); err != nil {
 		return "", err
 	}
 	return path, nil

@@ -157,6 +157,14 @@ func runPull(ctx context.Context, client *api.Client, project, env string, pc lo
 	// (typically 0644, world-readable). Truncate on open to match os.Create's
 	// overwrite semantics. If the file already exists with looser perms, tighten
 	// them - OpenFile's mode only applies on creation.
+	//
+	// Refuse to write through a symlink, matching the config/marker-file
+	// hardening elsewhere: a planted .env symlink in a shared checkout could
+	// redirect decrypted secrets to an unintended location (e.g.
+	// ~/.ssh/authorized_keys).
+	if fi, err := os.Lstat(pc.Out); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to write %s through a symlink", pc.Out)
+	}
 	f, err := os.OpenFile(pc.Out, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err

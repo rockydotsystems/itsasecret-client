@@ -501,11 +501,17 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (*http.R
 		return c.do(ctx, method, path, body)
 	}
 	// Rolling sessions: successful responses carry a fresh token that must
-	// replace the one we sent.
-	if newToken := resp.Header.Get("X-New-Session-Token"); newToken != "" && c.onNewToken != nil {
-		expiresAt, _ := time.Parse(time.RFC3339, resp.Header.Get("X-Session-Expires-At"))
-		c.token = newToken
-		c.onNewToken(newToken, expiresAt)
+	// replace the one we sent. Only honor the header on a 2xx response - a
+	// buggy or hostile server (or an injecting proxy) returning a 4xx/5xx with
+	// a bogus X-New-Session-Token would otherwise overwrite and persist the
+	// attacker-chosen token, discarding the real one and locking the user out
+	// once the grace window closes.
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if newToken := resp.Header.Get("X-New-Session-Token"); newToken != "" && c.onNewToken != nil {
+			expiresAt, _ := time.Parse(time.RFC3339, resp.Header.Get("X-Session-Expires-At"))
+			c.token = newToken
+			c.onNewToken(newToken, expiresAt)
+		}
 	}
 	return resp, nil
 }
